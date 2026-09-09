@@ -48,6 +48,10 @@ LV_DRAW_BUF_DEFINE_STATIC(game_buf, GAME_CANVAS_W, GAME_CANVAS_H, LV_COLOR_FORMA
 static egg_catcher_model_t s_model;
 static lv_obj_t *s_screen;
 static lv_obj_t *s_canvas;
+static lv_obj_t *s_score;
+static lv_obj_t *s_lives[EGG_CATCHER_MAX_MISSES];
+static lv_obj_t *s_egg_objects[EGG_CATCHER_MAX_EGGS];
+static lv_obj_t *s_basket;
 static lv_obj_t *s_message;
 static lv_obj_t *s_feedback;
 static lv_obj_t *s_battery;
@@ -129,45 +133,6 @@ static void canvas_circle(int cx, int cy, int radius, uint8_t color, bool fill)
     }
 }
 
-static void draw_egg(int cx, int cy, uint8_t fill_color)
-{
-    for (int y = -6; y <= 6; y++) {
-        for (int x = -4; x <= 4; x++) {
-            int distance = x * x * 9 + y * y * 4;
-            if (distance <= 144) canvas_px(cx + x, cy + y, fill_color);
-            if (distance >= 105 && distance <= 170) canvas_px(cx + x, cy + y, PAL_INK);
-        }
-    }
-}
-
-static void draw_digit(int digit, int x, int y)
-{
-    static const uint8_t segments[10] = {
-        0x3F, 0x06, 0x5B, 0x4F, 0x66,
-        0x6D, 0x7D, 0x07, 0x7F, 0x6F,
-    };
-    uint8_t mask = segments[digit % 10];
-    if (mask & 0x01) canvas_rect(x + 2, y, 8, 2, PAL_INK, true);
-    if (mask & 0x02) canvas_rect(x + 10, y + 2, 2, 8, PAL_INK, true);
-    if (mask & 0x04) canvas_rect(x + 10, y + 12, 2, 8, PAL_INK, true);
-    if (mask & 0x08) canvas_rect(x + 2, y + 20, 8, 2, PAL_INK, true);
-    if (mask & 0x10) canvas_rect(x, y + 12, 2, 8, PAL_INK, true);
-    if (mask & 0x20) canvas_rect(x, y + 2, 2, 8, PAL_INK, true);
-    if (mask & 0x40) canvas_rect(x + 2, y + 10, 8, 2, PAL_INK, true);
-}
-
-static void draw_score_and_misses(void)
-{
-    uint32_t score = s_model.score % 10000U;
-    for (int i = 3; i >= 0; i--) {
-        draw_digit((int)(score % 10U), 79 + i * 15, 5);
-        score /= 10U;
-    }
-    for (int i = 0; i < EGG_CATCHER_MAX_MISSES; i++) {
-        draw_egg(12 + i * 14, 15, i < s_model.misses ? PAL_RED : PAL_HI);
-    }
-}
-
 static void draw_ramp(egg_catcher_lane_t lane)
 {
     game_point_t start = LANE_START[lane];
@@ -224,25 +189,10 @@ static void draw_wolf(void)
     canvas_line(112, 173, 104, 178, PAL_INK);
 }
 
-static void draw_basket(egg_catcher_lane_t lane)
-{
-    game_point_t end = LANE_END[lane];
-    bool right = lane == EGG_LANE_RIGHT_UPPER || lane == EGG_LANE_RIGHT_LOWER;
-    int rim_left = right ? end.x - 5 : end.x - 14;
-    int rim_right = right ? end.x + 14 : end.x + 5;
-    int y = end.y + 5;
-    canvas_thick_line(rim_left, y, rim_right, y, PAL_RED);
-    canvas_thick_line(rim_left + 3, y + 1, rim_left + 7, y + 12, PAL_RED);
-    canvas_thick_line(rim_right - 3, y + 1, rim_right - 7, y + 12, PAL_RED);
-    canvas_thick_line(rim_left + 7, y + 12, rim_right - 7, y + 12, PAL_RED);
-}
-
-static void draw_scene(void)
+static void draw_static_scene(void)
 {
     if (!s_canvas) return;
     lv_canvas_fill_bg(s_canvas, lv_color_hex(LCD_BG_COLOR), LV_OPA_COVER);
-    draw_score_and_misses();
-
     canvas_line(52, 34, 164, 34, PAL_INK);
     for (int lane = 0; lane < EGG_CATCHER_LANE_COUNT; lane++) {
         draw_ramp((egg_catcher_lane_t)lane);
@@ -252,20 +202,36 @@ static void draw_scene(void)
     draw_chicken(false, 120);
     draw_chicken(true, 120);
     draw_wolf();
-    draw_basket(egg_catcher_model_basket_lane(&s_model));
+    lv_obj_invalidate(s_canvas);
+}
+
+static void refresh_dynamic_objects(void)
+{
+    lv_label_set_text_fmt(s_score, "%04lu", (unsigned long)(s_model.score % 10000U));
+    for (int i = 0; i < EGG_CATCHER_MAX_MISSES; i++) {
+        lv_obj_set_style_bg_color(s_lives[i],
+            lv_color_hex(i < s_model.misses ? LCD_RED_COLOR : LCD_HI_COLOR), 0);
+    }
+
+    egg_catcher_lane_t basket_lane = egg_catcher_model_basket_lane(&s_model);
+    game_point_t basket_end = LANE_END[basket_lane];
+    lv_obj_set_pos(s_basket, 12 + basket_end.x - 12, 54 + basket_end.y + 4);
 
     for (int i = 0; i < EGG_CATCHER_MAX_EGGS; i++) {
         const egg_catcher_egg_t *egg = &s_model.eggs[i];
-        if (!egg->active) continue;
+        lv_obj_t *object = s_egg_objects[i];
+        if (!egg->active) {
+            lv_obj_add_flag(object, LV_OBJ_FLAG_HIDDEN);
+            continue;
+        }
         game_point_t start = LANE_START[egg->lane];
         game_point_t end = LANE_END[egg->lane];
         int divisor = EGG_CATCHER_LANE_STEPS - 1;
         int x = start.x + (end.x - start.x) * egg->step / divisor;
         int y = start.y + (end.y - start.y) * egg->step / divisor;
-        draw_egg(x, y, PAL_HI);
+        lv_obj_set_pos(object, 12 + x - 5, 54 + y - 7);
+        lv_obj_remove_flag(object, LV_OBJ_FLAG_HIDDEN);
     }
-
-    lv_obj_invalidate(s_canvas);
 }
 
 static void refresh_message(void)
@@ -321,7 +287,7 @@ static void handle_input(game_input_t input)
         (void)egg_catcher_model_toggle_pause(&s_model);
         s_last_tick_ms = time_ms;
         refresh_message();
-        draw_scene();
+        refresh_dynamic_objects();
         return;
     }
     if (!primary_event(input.button, input.event, time_ms)) return;
@@ -340,7 +306,7 @@ static void handle_input(game_input_t input)
         egg_catcher_model_toggle_side(&s_model);
     }
     refresh_message();
-    draw_scene();
+    refresh_dynamic_objects();
 }
 
 static void show_feedback(const char *text, uint32_t color, uint64_t time_ms)
@@ -365,7 +331,7 @@ static void timer_cb(lv_timer_t *timer)
     s_last_tick_ms = time_ms;
 
     egg_catcher_event_t event = egg_catcher_model_advance(&s_model, (uint32_t)delta);
-    if (event != EGG_EVENT_NONE) draw_scene();
+    if (event != EGG_EVENT_NONE) refresh_dynamic_objects();
     if (event & EGG_EVENT_CAUGHT) show_feedback("CATCH!", UI_GRASS_DARK, time_ms);
     if (event & EGG_EVENT_MISSED) show_feedback("MISS!", UI_RED, time_ms);
     if (event & EGG_EVENT_GAME_OVER) refresh_message();
@@ -407,6 +373,43 @@ void egg_catcher_enter(bool buttons_available, bool battery_available)
                           lv_color_to_32(lv_color_hex(LCD_HI_COLOR), LV_OPA_COVER));
     lv_obj_set_pos(s_canvas, 12, 54);
 
+    s_score = ui_pixel_label(s_screen, "0000", &lv_font_montserrat_20, LCD_INK_COLOR);
+    lv_obj_set_width(s_score, 72);
+    lv_obj_set_style_text_align(s_score, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_pos(s_score, 84, 58);
+
+    for (int i = 0; i < EGG_CATCHER_MAX_MISSES; i++) {
+        s_lives[i] = lv_obj_create(s_screen);
+        lv_obj_set_size(s_lives[i], 9, 13);
+        lv_obj_set_pos(s_lives[i], 19 + i * 14, 61);
+        lv_obj_set_style_radius(s_lives[i], LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_style_border_color(s_lives[i], lv_color_hex(LCD_INK_COLOR), 0);
+        lv_obj_set_style_border_width(s_lives[i], 2, 0);
+        lv_obj_set_style_pad_all(s_lives[i], 0, 0);
+        lv_obj_remove_flag(s_lives[i], LV_OBJ_FLAG_SCROLLABLE);
+    }
+
+    s_basket = lv_obj_create(s_screen);
+    lv_obj_set_size(s_basket, 24, 14);
+    lv_obj_set_style_radius(s_basket, 3, 0);
+    lv_obj_set_style_bg_opa(s_basket, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_color(s_basket, lv_color_hex(LCD_RED_COLOR), 0);
+    lv_obj_set_style_border_width(s_basket, 3, 0);
+    lv_obj_set_style_pad_all(s_basket, 0, 0);
+    lv_obj_remove_flag(s_basket, LV_OBJ_FLAG_SCROLLABLE);
+
+    for (int i = 0; i < EGG_CATCHER_MAX_EGGS; i++) {
+        s_egg_objects[i] = lv_obj_create(s_screen);
+        lv_obj_set_size(s_egg_objects[i], 10, 14);
+        lv_obj_set_style_radius(s_egg_objects[i], LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_style_bg_color(s_egg_objects[i], lv_color_hex(LCD_HI_COLOR), 0);
+        lv_obj_set_style_border_color(s_egg_objects[i], lv_color_hex(LCD_INK_COLOR), 0);
+        lv_obj_set_style_border_width(s_egg_objects[i], 2, 0);
+        lv_obj_set_style_pad_all(s_egg_objects[i], 0, 0);
+        lv_obj_remove_flag(s_egg_objects[i], LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_add_flag(s_egg_objects[i], LV_OBJ_FLAG_HIDDEN);
+    }
+
     s_battery = ui_pixel_label(s_screen, "", &lv_font_montserrat_14, UI_INK);
     lv_obj_set_width(s_battery, 58);
     lv_obj_set_style_text_align(s_battery, LV_TEXT_ALIGN_RIGHT, 0);
@@ -431,7 +434,8 @@ void egg_catcher_enter(bool buttons_available, bool battery_available)
     lv_obj_set_style_border_width(s_message, 3, 0);
     lv_obj_set_style_pad_top(s_message, 10, 0);
 
-    draw_scene();
+    draw_static_scene();
+    refresh_dynamic_objects();
     if (!buttons_available) {
         lv_label_set_text(s_message, "BUTTONS NOT FOUND\n\nCHECK THE BOARD");
     } else {
