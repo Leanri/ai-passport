@@ -43,7 +43,7 @@ static const game_point_t LANE_END[EGG_CATCHER_LANE_COUNT] = {
     { 84, 108 }, { 132, 108 }, { 84, 174 }, { 132, 174 },
 };
 
-LV_DRAW_BUF_DEFINE_STATIC(game_buf, GAME_CANVAS_W, GAME_CANVAS_H, LV_COLOR_FORMAT_I2);
+LV_DRAW_BUF_DEFINE_STATIC(game_buf, GAME_CANVAS_W, GAME_CANVAS_H, LV_COLOR_FORMAT_I4);
 
 static egg_catcher_model_t s_model;
 static lv_obj_t *s_screen;
@@ -71,8 +71,8 @@ static void canvas_px(int x, int y, uint8_t color)
     lv_draw_buf_t *draw_buf = lv_canvas_get_draw_buf(s_canvas);
     uint8_t *data = lv_draw_buf_goto_xy(draw_buf, x, y);
     if (!data) return;
-    uint8_t shift = (uint8_t)(6 - 2 * (x & 3));
-    *data = (uint8_t)((*data & ~(0x03U << shift)) | ((color & 0x03U) << shift));
+    uint8_t shift = (uint8_t)(4 - 4 * (x & 1));
+    *data = (uint8_t)((*data & ~(0x0FU << shift)) | ((color & 0x0FU) << shift));
 }
 
 static void canvas_rect(int x, int y, int width, int height, uint8_t color, bool fill)
@@ -443,7 +443,7 @@ void egg_catcher_enter(bool buttons_available, bool battery_available)
     s_last_tick_ms = now_ms();
     s_battery_due_ms = s_last_tick_ms + 15000U;
     s_feedback_until_ms = 0;
-    s_timer = lv_timer_create(timer_cb, 40, NULL);
+    s_timer = lv_timer_create(timer_cb, 80, NULL);
 
     lv_mem_monitor_t memory;
     lv_mem_monitor(&memory);
