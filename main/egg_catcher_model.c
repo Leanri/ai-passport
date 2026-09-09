@@ -14,10 +14,7 @@ static uint32_t random_next(egg_catcher_model_t *model)
 
 egg_catcher_lane_t egg_catcher_model_basket_lane(const egg_catcher_model_t *model)
 {
-    if (model->basket_right) {
-        return model->basket_upper ? EGG_LANE_RIGHT_UPPER : EGG_LANE_RIGHT_LOWER;
-    }
-    return model->basket_upper ? EGG_LANE_LEFT_UPPER : EGG_LANE_LEFT_LOWER;
+    return model->basket_right ? EGG_LANE_RIGHT : EGG_LANE_LEFT;
 }
 
 uint32_t egg_catcher_model_move_interval_ms(const egg_catcher_model_t *model)
@@ -63,7 +60,6 @@ void egg_catcher_model_init(egg_catcher_model_t *model, uint32_t seed)
     memset(model, 0, sizeof(*model));
     model->rng = seed ? seed : 0xC001D00DU;
     model->state = EGG_GAME_READY;
-    model->basket_upper = false;
     model->basket_right = false;
 }
 
@@ -73,32 +69,18 @@ void egg_catcher_model_start(egg_catcher_model_t *model)
     memset(model, 0, sizeof(*model));
     model->rng = seed;
     model->state = EGG_GAME_PLAYING;
-    model->basket_upper = false;
     model->basket_right = false;
     (void)spawn_egg(model);
 }
 
-void egg_catcher_model_set_height(egg_catcher_model_t *model, bool upper)
+void egg_catcher_model_set_side(egg_catcher_model_t *model, bool right)
 {
-    model->basket_upper = upper;
+    model->basket_right = right;
 }
 
 void egg_catcher_model_toggle_side(egg_catcher_model_t *model)
 {
     model->basket_right = !model->basket_right;
-}
-
-bool egg_catcher_model_toggle_pause(egg_catcher_model_t *model)
-{
-    if (model->state == EGG_GAME_PLAYING) {
-        model->state = EGG_GAME_PAUSED;
-        return true;
-    }
-    if (model->state == EGG_GAME_PAUSED) {
-        model->state = EGG_GAME_PLAYING;
-        return true;
-    }
-    return false;
 }
 
 static egg_catcher_event_t move_eggs(egg_catcher_model_t *model)

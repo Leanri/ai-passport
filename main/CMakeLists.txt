@@ -4,6 +4,7 @@ idf_component_register(
          "ui_pixel_math.c"
          "egg_catcher.c"
          "egg_catcher_model.c"
+         "egg_sprites.c"
     INCLUDE_DIRS "."
     REQUIRES bsp esp_timer
 )

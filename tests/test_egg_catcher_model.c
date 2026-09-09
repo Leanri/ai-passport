@@ -16,12 +16,12 @@ static void test_initial_state_and_controls(void)
     egg_catcher_model_t model;
     egg_catcher_model_init(&model, 1234);
     assert(model.state == EGG_GAME_READY);
-    assert(egg_catcher_model_basket_lane(&model) == EGG_LANE_LEFT_LOWER);
+    assert(egg_catcher_model_basket_lane(&model) == EGG_LANE_LEFT);
 
-    egg_catcher_model_set_height(&model, true);
-    assert(egg_catcher_model_basket_lane(&model) == EGG_LANE_LEFT_UPPER);
-    egg_catcher_model_toggle_side(&model);
-    assert(egg_catcher_model_basket_lane(&model) == EGG_LANE_RIGHT_UPPER);
+    egg_catcher_model_set_side(&model, true);
+    assert(egg_catcher_model_basket_lane(&model) == EGG_LANE_RIGHT);
+    egg_catcher_model_set_side(&model, false);
+    assert(egg_catcher_model_basket_lane(&model) == EGG_LANE_LEFT);
 }
 
 static void test_catch_scores(void)
@@ -31,10 +31,7 @@ static void test_catch_scores(void)
     egg_catcher_model_start(&model);
     egg_catcher_egg_t *egg = first_egg(&model);
     assert(egg != NULL);
-    model.basket_right = egg->lane == EGG_LANE_RIGHT_UPPER ||
-                         egg->lane == EGG_LANE_RIGHT_LOWER;
-    model.basket_upper = egg->lane == EGG_LANE_LEFT_UPPER ||
-                         egg->lane == EGG_LANE_RIGHT_UPPER;
+    model.basket_right = egg->lane == EGG_LANE_RIGHT;
     egg->step = EGG_CATCHER_LANE_STEPS - 1;
 
     egg_catcher_event_t event = egg_catcher_model_advance(
@@ -58,8 +55,7 @@ static void test_three_misses_end_game(void)
             egg = first_egg(&model);
         }
         assert(egg != NULL);
-        model.basket_right = !(egg->lane == EGG_LANE_RIGHT_UPPER ||
-                               egg->lane == EGG_LANE_RIGHT_LOWER);
+        model.basket_right = egg->lane != EGG_LANE_RIGHT;
         egg->step = EGG_CATCHER_LANE_STEPS - 1;
         egg_catcher_event_t event = egg_catcher_model_advance(
             &model, egg_catcher_model_move_interval_ms(&model));
@@ -69,17 +65,11 @@ static void test_three_misses_end_game(void)
     assert(model.state == EGG_GAME_OVER);
 }
 
-static void test_pause_and_difficulty(void)
+static void test_difficulty(void)
 {
     egg_catcher_model_t model;
     egg_catcher_model_init(&model, 33);
     egg_catcher_model_start(&model);
-    egg_catcher_egg_t before = *first_egg(&model);
-
-    assert(egg_catcher_model_toggle_pause(&model));
-    assert(egg_catcher_model_advance(&model, 5000) == EGG_EVENT_NONE);
-    assert(first_egg(&model)->step == before.step);
-    assert(egg_catcher_model_toggle_pause(&model));
 
     model.score = 100;
     assert(egg_catcher_model_move_interval_ms(&model) == 168);
@@ -91,7 +81,7 @@ int main(void)
     test_initial_state_and_controls();
     test_catch_scores();
     test_three_misses_end_game();
-    test_pause_and_difficulty();
+    test_difficulty();
     puts("egg_catcher_model: all tests passed");
     return 0;
 }

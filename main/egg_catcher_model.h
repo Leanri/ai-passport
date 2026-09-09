@@ -3,22 +3,19 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define EGG_CATCHER_LANE_COUNT 4
-#define EGG_CATCHER_MAX_EGGS   4
+#define EGG_CATCHER_LANE_COUNT 2
+#define EGG_CATCHER_MAX_EGGS   2
 #define EGG_CATCHER_LANE_STEPS 7
 #define EGG_CATCHER_MAX_MISSES 3
 
 typedef enum {
-    EGG_LANE_LEFT_UPPER = 0,
-    EGG_LANE_RIGHT_UPPER,
-    EGG_LANE_LEFT_LOWER,
-    EGG_LANE_RIGHT_LOWER,
+    EGG_LANE_LEFT = 0,
+    EGG_LANE_RIGHT,
 } egg_catcher_lane_t;
 
 typedef enum {
     EGG_GAME_READY = 0,
     EGG_GAME_PLAYING,
-    EGG_GAME_PAUSED,
     EGG_GAME_OVER,
 } egg_catcher_state_t;
 
@@ -46,14 +43,12 @@ typedef struct {
     uint32_t spawn_elapsed_ms;
     uint8_t misses;
     bool basket_right;
-    bool basket_upper;
 } egg_catcher_model_t;
 
 void egg_catcher_model_init(egg_catcher_model_t *model, uint32_t seed);
 void egg_catcher_model_start(egg_catcher_model_t *model);
-void egg_catcher_model_set_height(egg_catcher_model_t *model, bool upper);
+void egg_catcher_model_set_side(egg_catcher_model_t *model, bool right);
 void egg_catcher_model_toggle_side(egg_catcher_model_t *model);
-bool egg_catcher_model_toggle_pause(egg_catcher_model_t *model);
 egg_catcher_lane_t egg_catcher_model_basket_lane(const egg_catcher_model_t *model);
 egg_catcher_event_t egg_catcher_model_advance(egg_catcher_model_t *model,
                                                uint32_t elapsed_ms);
