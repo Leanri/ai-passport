@@ -65,9 +65,9 @@ static const uint32_t WOLF_COLORS[15] = {
 };
 
 extern const uint8_t egg_game_background_start[]
-    asm("_binary_assets_egg_game_background_rgb565_start");
+    asm("_binary_egg_game_background_rgb565_start");
 extern const uint8_t egg_game_wolf_start[]
-    asm("_binary_assets_egg_game_wolf_i4_start");
+    asm("_binary_egg_game_wolf_i4_start");
 
 static const lv_image_dsc_t BACKGROUND_IMAGE = {
     .header = {
