@@ -48,6 +48,7 @@ static bool spawn_egg(egg_catcher_model_t *model)
         uint8_t lane = (uint8_t)((start + offset) % EGG_CATCHER_LANE_COUNT);
         if (lane_busy[lane]) continue;
         model->eggs[free_slot].active = true;
+        model->eggs[free_slot].falling = false;
         model->eggs[free_slot].lane = (egg_catcher_lane_t)lane;
         model->eggs[free_slot].step = 0;
         return true;
@@ -92,21 +93,33 @@ static egg_catcher_event_t move_eggs(egg_catcher_model_t *model)
         egg_catcher_egg_t *egg = &model->eggs[i];
         if (!egg->active) continue;
 
-        egg->step++;
-        event |= EGG_EVENT_MOVED;
-        if (egg->step < EGG_CATCHER_LANE_STEPS) continue;
+        if (egg->falling) {
+            egg->step++;
+            event |= EGG_EVENT_MOVED;
+            if (egg->step < EGG_CATCHER_FALL_STEPS) continue;
 
-        egg->active = false;
-        if (egg->lane == basket) {
-            model->score++;
-            event |= EGG_EVENT_CAUGHT;
-        } else {
+            egg->active = false;
+            model->last_missed_lane = egg->lane;
             model->misses++;
             event |= EGG_EVENT_MISSED;
             if (model->misses >= EGG_CATCHER_MAX_MISSES) {
                 model->state = EGG_GAME_OVER;
                 event |= EGG_EVENT_GAME_OVER;
             }
+            continue;
+        }
+
+        egg->step++;
+        event |= EGG_EVENT_MOVED;
+        if (egg->step < EGG_CATCHER_LANE_STEPS) continue;
+
+        if (egg->lane == basket) {
+            egg->active = false;
+            model->score++;
+            event |= EGG_EVENT_CAUGHT;
+        } else {
+            egg->falling = true;
+            egg->step = 0;
         }
     }
     return event;

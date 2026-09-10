@@ -16,6 +16,9 @@
 #define WOLF_RIGHT_X  80
 #define WOLF_Y        109
 #define GAME_TIMER_PERIOD_MS 30
+#define EGG_SPRITE_SIZE 16
+#define BREAK_SPRITE_W 28
+#define BREAK_SPRITE_H 20
 
 #define LCD_BG_COLOR 0xB8C6A3
 #define LCD_INK_COLOR 0x17251D
@@ -49,9 +52,39 @@ static const game_point_t LANE_START[EGG_CATCHER_LANE_COUNT] = {
 static const game_point_t LANE_END[EGG_CATCHER_LANE_COUNT] = {
     { 72, 142 }, { 144, 142 },
 };
+static const int8_t FALL_X[EGG_CATCHER_FALL_STEPS] = { 2, 6, 10 };
+static const int8_t FALL_Y[EGG_CATCHER_FALL_STEPS] = { 8, 27, 52 };
+
+static const uint16_t EGG_OUTER_MASKS[4][EGG_SPRITE_SIZE] = {
+    { 0x0080, 0x01C0, 0x07F0, 0x0FF8, 0x0FF8, 0x1FFC, 0x1FFC, 0x1FFC,
+      0x3FFE, 0x3FFE, 0x3FFE, 0x1FFC, 0x1FFC, 0x0FF8, 0x07F0, 0x0080 },
+    { 0x0000, 0x0380, 0x3FE0, 0x1FF8, 0x1FFC, 0x3FFE, 0x3FFE, 0x3FFF,
+      0x1FFF, 0x3FFE, 0x1FFE, 0x0FFC, 0x0FFC, 0x07F4, 0x01E0, 0x0000 },
+    { 0x0000, 0x00E0, 0x07F8, 0x1FFC, 0x3FFE, 0x3FFE, 0x7FFE, 0xFFFF,
+      0x7FFE, 0x3FFE, 0x3FFE, 0x1FFC, 0x07F8, 0x00E0, 0x0000, 0x0000 },
+    { 0x0180, 0x07E0, 0x0FF8, 0x1FF8, 0x1FFC, 0x3FFE, 0x3FFE, 0x7FFE,
+      0x7FFE, 0x7FFC, 0x3FFC, 0x3FF8, 0x3FE0, 0x0740, 0x0000, 0x0000 },
+};
+
+static const uint16_t EGG_INNER_MASKS[4][EGG_SPRITE_SIZE] = {
+    { 0x0000, 0x0000, 0x0000, 0x0080, 0x03E0, 0x03E0, 0x07F0, 0x07F0,
+      0x0FF8, 0x0FF8, 0x07F0, 0x07F0, 0x03E0, 0x0080, 0x0000, 0x0000 },
+    { 0x0000, 0x0000, 0x0000, 0x0100, 0x0FD0, 0x07F8, 0x0FF0, 0x07F8,
+      0x07F8, 0x07FC, 0x07F8, 0x03F8, 0x00A0, 0x0000, 0x0000, 0x0000 },
+    { 0x0000, 0x0000, 0x0000, 0x00C0, 0x03F0, 0x0FF8, 0x0FF8, 0x1FFC,
+      0x0FF8, 0x0FF8, 0x03F0, 0x00C0, 0x0000, 0x0000, 0x0000, 0x0000 },
+    { 0x0000, 0x0000, 0x0040, 0x05F0, 0x0FF0, 0x07F8, 0x0FF0, 0x0FF8,
+      0x1FF0, 0x0FF0, 0x0FE0, 0x0200, 0x0000, 0x0000, 0x0000, 0x0000 },
+};
 
 LV_DRAW_BUF_DEFINE_STATIC(game_buf, GAME_CANVAS_W, GAME_CANVAS_H, LV_COLOR_FORMAT_I4);
 LV_DRAW_BUF_DEFINE_STATIC(wolf_buf, EGG_WOLF_SPRITE_WIDTH, EGG_WOLF_SPRITE_HEIGHT,
+                          LV_COLOR_FORMAT_I4);
+LV_DRAW_BUF_DEFINE_STATIC(egg0_buf, EGG_SPRITE_SIZE, EGG_SPRITE_SIZE,
+                          LV_COLOR_FORMAT_I4);
+LV_DRAW_BUF_DEFINE_STATIC(egg1_buf, EGG_SPRITE_SIZE, EGG_SPRITE_SIZE,
+                          LV_COLOR_FORMAT_I4);
+LV_DRAW_BUF_DEFINE_STATIC(break_buf, BREAK_SPRITE_W, BREAK_SPRITE_H,
                           LV_COLOR_FORMAT_I4);
 
 static egg_catcher_model_t s_model;
@@ -63,11 +96,13 @@ static lv_obj_t *s_egg_objects[EGG_CATCHER_MAX_EGGS];
 static lv_obj_t *s_wolf;
 static lv_obj_t *s_message;
 static lv_obj_t *s_feedback;
+static lv_obj_t *s_break;
 static lv_obj_t *s_battery;
 static lv_timer_t *s_timer;
 static QueueHandle_t s_input_queue;
 static uint64_t s_last_tick_ms;
 static uint64_t s_feedback_until_ms;
+static uint64_t s_break_until_ms;
 static uint64_t s_battery_due_ms;
 static uint64_t s_last_press_ms[3];
 static bool s_press_seen[3];
@@ -140,6 +175,137 @@ static bool mask_pixel(const uint8_t *mask, int width, int x, int y)
 {
     int stride = (width + 7) / 8;
     return (mask[y * stride + x / 8] & (0x80U >> (x & 7))) != 0;
+}
+
+static void sprite_px(lv_obj_t *canvas, int width, int height,
+                      int x, int y, uint8_t color)
+{
+    if (!canvas || x < 0 || x >= width || y < 0 || y >= height) return;
+    lv_draw_buf_t *draw_buf = lv_canvas_get_draw_buf(canvas);
+    uint8_t *data = lv_draw_buf_goto_xy(draw_buf, x, y);
+    if (!data) return;
+    uint8_t shift = (uint8_t)(4 - 4 * (x & 1));
+    *data = (uint8_t)((*data & ~(0x0FU << shift)) | ((color & 0x0FU) << shift));
+}
+
+static void sprite_line(lv_obj_t *canvas, int width, int height,
+                        int x0, int y0, int x1, int y1, uint8_t color)
+{
+    int dx = x1 > x0 ? x1 - x0 : x0 - x1;
+    int sx = x0 < x1 ? 1 : -1;
+    int dy = y1 > y0 ? y0 - y1 : y1 - y0;
+    int sy = y0 < y1 ? 1 : -1;
+    int error = dx + dy;
+
+    for (;;) {
+        sprite_px(canvas, width, height, x0, y0, color);
+        if (x0 == x1 && y0 == y1) break;
+        int twice = 2 * error;
+        if (twice >= dy) {
+            error += dy;
+            x0 += sx;
+        }
+        if (twice <= dx) {
+            error += dx;
+            y0 += sy;
+        }
+    }
+}
+
+static void sprite_filled_circle(lv_obj_t *canvas, int width, int height,
+                                 int cx, int cy, int radius, uint8_t color)
+{
+    int limit = radius * radius;
+    for (int y = -radius; y <= radius; y++) {
+        for (int x = -radius; x <= radius; x++) {
+            if (x * x + y * y <= limit) {
+                sprite_px(canvas, width, height, cx + x, cy + y, color);
+            }
+        }
+    }
+}
+
+static void clear_sprite(lv_obj_t *canvas, int width, int height)
+{
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) sprite_px(canvas, width, height, x, y, PAL_BG);
+    }
+}
+
+static void draw_egg_frame(lv_obj_t *canvas, uint8_t frame)
+{
+    frame &= 3U;
+    clear_sprite(canvas, EGG_SPRITE_SIZE, EGG_SPRITE_SIZE);
+    for (int y = 0; y < EGG_SPRITE_SIZE; y++) {
+        for (int x = 0; x < EGG_SPRITE_SIZE; x++) {
+            uint16_t bit = (uint16_t)(0x8000U >> x);
+            if (EGG_OUTER_MASKS[frame][y] & bit) {
+                sprite_px(canvas, EGG_SPRITE_SIZE, EGG_SPRITE_SIZE,
+                          x, y, PAL_INK);
+            }
+            if (EGG_INNER_MASKS[frame][y] & bit) {
+                sprite_px(canvas, EGG_SPRITE_SIZE, EGG_SPRITE_SIZE,
+                          x, y, PAL_HI);
+            }
+        }
+    }
+    lv_obj_invalidate(canvas);
+}
+
+static void draw_shell_half(bool right)
+{
+    static const uint8_t min_x[] = { 7, 5, 4, 3, 2, 2, 2, 3, 4, 6, 8 };
+    static const uint8_t max_x[] = { 9, 10, 10, 9, 11, 9, 11, 9, 11, 12, 12 };
+    for (int row = 0; row < 11; row++) {
+        int y = row + 4;
+        for (int x = min_x[row]; x <= max_x[row]; x++) {
+            int draw_x = right ? BREAK_SPRITE_W - 1 - x : x;
+            sprite_px(s_break, BREAK_SPRITE_W, BREAK_SPRITE_H,
+                      draw_x, y, PAL_HI);
+        }
+    }
+
+    static const game_point_t edge[] = {
+        { 9, 4 }, { 6, 4 }, { 4, 6 }, { 2, 9 },
+        { 3, 12 }, { 6, 14 }, { 12, 14 },
+    };
+    static const game_point_t crack[] = {
+        { 9, 4 }, { 11, 6 }, { 8, 7 }, { 11, 9 },
+        { 8, 10 }, { 12, 12 }, { 12, 14 },
+    };
+    for (size_t i = 1; i < sizeof(edge) / sizeof(edge[0]); i++) {
+        int x0 = right ? BREAK_SPRITE_W - 1 - edge[i - 1].x : edge[i - 1].x;
+        int x1 = right ? BREAK_SPRITE_W - 1 - edge[i].x : edge[i].x;
+        sprite_line(s_break, BREAK_SPRITE_W, BREAK_SPRITE_H,
+                    x0, edge[i - 1].y, x1, edge[i].y, PAL_INK);
+    }
+    for (size_t i = 1; i < sizeof(crack) / sizeof(crack[0]); i++) {
+        int x0 = right ? BREAK_SPRITE_W - 1 - crack[i - 1].x : crack[i - 1].x;
+        int x1 = right ? BREAK_SPRITE_W - 1 - crack[i].x : crack[i].x;
+        sprite_line(s_break, BREAK_SPRITE_W, BREAK_SPRITE_H,
+                    x0, crack[i - 1].y, x1, crack[i].y, PAL_INK);
+    }
+}
+
+static void show_broken_egg(egg_catcher_lane_t lane, uint64_t time_ms)
+{
+    clear_sprite(s_break, BREAK_SPRITE_W, BREAK_SPRITE_H);
+    sprite_line(s_break, BREAK_SPRITE_W, BREAK_SPRITE_H, 4, 17, 24, 17, PAL_INK);
+    sprite_line(s_break, BREAK_SPRITE_W, BREAK_SPRITE_H, 7, 15, 3, 18, PAL_INK);
+    sprite_line(s_break, BREAK_SPRITE_W, BREAK_SPRITE_H, 21, 15, 25, 18, PAL_INK);
+    sprite_filled_circle(s_break, BREAK_SPRITE_W, BREAK_SPRITE_H,
+                         14, 16, 5, PAL_INK);
+    sprite_filled_circle(s_break, BREAK_SPRITE_W, BREAK_SPRITE_H,
+                         14, 16, 3, PAL_RED);
+    draw_shell_half(false);
+    draw_shell_half(true);
+
+    int direction = lane == EGG_LANE_LEFT ? 1 : -1;
+    int impact_x = LANE_END[lane].x + direction * FALL_X[EGG_CATCHER_FALL_STEPS - 1];
+    lv_obj_set_pos(s_break, 12 + impact_x - BREAK_SPRITE_W / 2, 54 + 184);
+    lv_obj_remove_flag(s_break, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_invalidate(s_break);
+    s_break_until_ms = time_ms + 900U;
 }
 
 static void draw_ramp(egg_catcher_lane_t lane)
@@ -295,12 +461,27 @@ static void refresh_dynamic_objects(void)
             lv_obj_add_flag(object, LV_OBJ_FLAG_HIDDEN);
             continue;
         }
-        game_point_t start = LANE_START[egg->lane];
-        game_point_t end = LANE_END[egg->lane];
-        int divisor = EGG_CATCHER_LANE_STEPS - 1;
-        int x = start.x + (end.x - start.x) * egg->step / divisor;
-        int y = start.y + (end.y - start.y) * egg->step / divisor;
-        lv_obj_set_pos(object, 12 + x - 5, 54 + y - 7);
+        int x;
+        int y;
+        uint8_t frame;
+        if (egg->falling) {
+            uint8_t fall_step = egg->step < EGG_CATCHER_FALL_STEPS
+                                    ? egg->step : EGG_CATCHER_FALL_STEPS - 1;
+            int direction = egg->lane == EGG_LANE_LEFT ? 1 : -1;
+            x = LANE_END[egg->lane].x + direction * FALL_X[fall_step];
+            y = LANE_END[egg->lane].y + FALL_Y[fall_step];
+            frame = (uint8_t)(EGG_CATCHER_LANE_STEPS + fall_step);
+        } else {
+            game_point_t start = LANE_START[egg->lane];
+            game_point_t end = LANE_END[egg->lane];
+            int divisor = EGG_CATCHER_LANE_STEPS - 1;
+            x = start.x + (end.x - start.x) * egg->step / divisor;
+            y = start.y + (end.y - start.y) * egg->step / divisor;
+            frame = egg->step;
+        }
+        draw_egg_frame(object, frame);
+        lv_obj_set_pos(object, 12 + x - EGG_SPRITE_SIZE / 2,
+                       54 + y - EGG_SPRITE_SIZE / 2);
         lv_obj_remove_flag(object, LV_OBJ_FLAG_HIDDEN);
     }
 }
@@ -354,6 +535,8 @@ static void handle_input(game_input_t input)
 
     if (s_model.state == EGG_GAME_READY || s_model.state == EGG_GAME_OVER) {
         egg_catcher_model_start(&s_model);
+        lv_obj_add_flag(s_break, LV_OBJ_FLAG_HIDDEN);
+        s_break_until_ms = 0;
         s_last_tick_ms = time_ms;
     }
     if (s_model.state != EGG_GAME_PLAYING) return;
@@ -393,12 +576,19 @@ static void timer_cb(lv_timer_t *timer)
     egg_catcher_event_t event = egg_catcher_model_advance(&s_model, (uint32_t)delta);
     if (event != EGG_EVENT_NONE) refresh_dynamic_objects();
     if (event & EGG_EVENT_CAUGHT) show_feedback("CATCH!", UI_GRASS_DARK, time_ms);
-    if (event & EGG_EVENT_MISSED) show_feedback("MISS!", UI_RED, time_ms);
+    if (event & EGG_EVENT_MISSED) {
+        show_feedback("MISS!", UI_RED, time_ms);
+        show_broken_egg(s_model.last_missed_lane, time_ms);
+    }
     if (event & EGG_EVENT_GAME_OVER) refresh_message();
 
     if (s_feedback_until_ms && time_ms >= s_feedback_until_ms) {
         lv_obj_add_flag(s_feedback, LV_OBJ_FLAG_HIDDEN);
         s_feedback_until_ms = 0;
+    }
+    if (s_break_until_ms && time_ms >= s_break_until_ms) {
+        lv_obj_add_flag(s_break, LV_OBJ_FLAG_HIDDEN);
+        s_break_until_ms = 0;
     }
     if (s_battery_available && time_ms >= s_battery_due_ms) {
         update_battery();
@@ -461,17 +651,35 @@ void egg_catcher_enter(bool buttons_available, bool battery_available)
                           lv_color_to_32(lv_color_hex(LCD_INK_COLOR), LV_OPA_COVER));
     lv_obj_remove_flag(s_wolf, LV_OBJ_FLAG_SCROLLABLE);
 
+    LV_DRAW_BUF_INIT_STATIC(egg0_buf);
+    LV_DRAW_BUF_INIT_STATIC(egg1_buf);
+    lv_draw_buf_t *egg_buffers[EGG_CATCHER_MAX_EGGS] = { &egg0_buf, &egg1_buf };
     for (int i = 0; i < EGG_CATCHER_MAX_EGGS; i++) {
-        s_egg_objects[i] = lv_obj_create(s_screen);
-        lv_obj_set_size(s_egg_objects[i], 10, 14);
-        lv_obj_set_style_radius(s_egg_objects[i], LV_RADIUS_CIRCLE, 0);
-        lv_obj_set_style_bg_color(s_egg_objects[i], lv_color_hex(LCD_HI_COLOR), 0);
-        lv_obj_set_style_border_color(s_egg_objects[i], lv_color_hex(LCD_INK_COLOR), 0);
-        lv_obj_set_style_border_width(s_egg_objects[i], 2, 0);
-        lv_obj_set_style_pad_all(s_egg_objects[i], 0, 0);
+        s_egg_objects[i] = lv_canvas_create(s_screen);
+        lv_canvas_set_draw_buf(s_egg_objects[i], egg_buffers[i]);
+        lv_canvas_set_palette(s_egg_objects[i], PAL_BG,
+                              lv_color_to_32(lv_color_hex(LCD_BG_COLOR), LV_OPA_TRANSP));
+        lv_canvas_set_palette(s_egg_objects[i], PAL_INK,
+                              lv_color_to_32(lv_color_hex(LCD_INK_COLOR), LV_OPA_COVER));
+        lv_canvas_set_palette(s_egg_objects[i], PAL_HI,
+                              lv_color_to_32(lv_color_hex(LCD_HI_COLOR), LV_OPA_COVER));
         lv_obj_remove_flag(s_egg_objects[i], LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_add_flag(s_egg_objects[i], LV_OBJ_FLAG_HIDDEN);
     }
+
+    LV_DRAW_BUF_INIT_STATIC(break_buf);
+    s_break = lv_canvas_create(s_screen);
+    lv_canvas_set_draw_buf(s_break, &break_buf);
+    lv_canvas_set_palette(s_break, PAL_BG,
+                          lv_color_to_32(lv_color_hex(LCD_BG_COLOR), LV_OPA_TRANSP));
+    lv_canvas_set_palette(s_break, PAL_INK,
+                          lv_color_to_32(lv_color_hex(LCD_INK_COLOR), LV_OPA_COVER));
+    lv_canvas_set_palette(s_break, PAL_RED,
+                          lv_color_to_32(lv_color_hex(LCD_RED_COLOR), LV_OPA_COVER));
+    lv_canvas_set_palette(s_break, PAL_HI,
+                          lv_color_to_32(lv_color_hex(LCD_HI_COLOR), LV_OPA_COVER));
+    lv_obj_remove_flag(s_break, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(s_break, LV_OBJ_FLAG_HIDDEN);
 
     s_battery = ui_pixel_label(s_screen, "", &lv_font_montserrat_14, UI_INK);
     lv_obj_set_width(s_battery, 58);
@@ -510,6 +718,7 @@ void egg_catcher_enter(bool buttons_available, bool battery_available)
     s_last_tick_ms = now_ms();
     s_battery_due_ms = s_last_tick_ms + 15000U;
     s_feedback_until_ms = 0;
+    s_break_until_ms = 0;
     s_timer = lv_timer_create(timer_cb, GAME_TIMER_PERIOD_MS, NULL);
 
     lv_mem_monitor_t memory;

@@ -6,6 +6,7 @@
 #define EGG_CATCHER_LANE_COUNT 2
 #define EGG_CATCHER_MAX_EGGS   2
 #define EGG_CATCHER_LANE_STEPS 7
+#define EGG_CATCHER_FALL_STEPS 3
 #define EGG_CATCHER_MAX_MISSES 3
 
 typedef enum {
@@ -30,6 +31,7 @@ typedef enum {
 
 typedef struct {
     bool active;
+    bool falling;
     egg_catcher_lane_t lane;
     uint8_t step;
 } egg_catcher_egg_t;
@@ -42,6 +44,7 @@ typedef struct {
     uint32_t move_elapsed_ms;
     uint32_t spawn_elapsed_ms;
     uint8_t misses;
+    egg_catcher_lane_t last_missed_lane;
     bool basket_right;
 } egg_catcher_model_t;
 
