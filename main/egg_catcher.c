@@ -85,6 +85,8 @@ static const int8_t FALL_Y[2][EGG_CATCHER_UPPER_FALL_STEPS] = {
 
 extern const uint8_t egg_game_background_start[]
     asm("_binary_egg_game_background_rgb565_start");
+extern const uint8_t egg_game_win_start[]
+    asm("_binary_egg_game_win_rgb565_start");
 extern const uint8_t egg_game_fox_left_start[]
     asm("_binary_egg_game_fox_left_argb8888_start");
 extern const uint8_t egg_game_fox_right_start[]
@@ -104,6 +106,18 @@ static const lv_image_dsc_t BACKGROUND_IMAGE = {
     },
     .data_size = GAME_SCREEN_W * GAME_SCREEN_H * 2,
     .data = egg_game_background_start,
+};
+
+static const lv_image_dsc_t WIN_IMAGE = {
+    .header = {
+        .magic = LV_IMAGE_HEADER_MAGIC,
+        .cf = LV_COLOR_FORMAT_RGB565,
+        .w = GAME_SCREEN_W,
+        .h = GAME_SCREEN_H,
+        .stride = GAME_SCREEN_W * 2,
+    },
+    .data_size = GAME_SCREEN_W * GAME_SCREEN_H * 2,
+    .data = egg_game_win_start,
 };
 
 #define FOX_IMAGE(source) \
@@ -172,6 +186,7 @@ LV_DRAW_BUF_DEFINE_STATIC(break_buf, BREAK_SPRITE_W, BREAK_SPRITE_H,
 static egg_catcher_model_t s_model;
 static lv_obj_t *s_screen;
 static lv_obj_t *s_background;
+static lv_obj_t *s_win_image;
 static lv_obj_t *s_score;
 static lv_obj_t *s_lives[EGG_CATCHER_MAX_MISSES];
 static lv_obj_t *s_egg_objects[EGG_CATCHER_MAX_EGGS];
@@ -689,6 +704,14 @@ static void refresh_dynamic_objects(uint64_t time_ms)
 static void refresh_message(void)
 {
     if (!s_message) return;
+    if (s_win_image) {
+        if (s_model.state == EGG_GAME_WON) {
+            lv_obj_remove_flag(s_win_image, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_move_foreground(s_win_image);
+        } else {
+            lv_obj_add_flag(s_win_image, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
     if (s_model.state == EGG_GAME_READY) {
         lv_label_set_text(s_message,
                           "UP: LEFT  DOWN: RIGHT\n\nPRESS UP OR DOWN\nHOLD OK: EXIT");
@@ -698,8 +721,7 @@ static void refresh_message(void)
                               (unsigned long)(s_model.score % 10000U));
         lv_obj_remove_flag(s_message, LV_OBJ_FLAG_HIDDEN);
     } else if (s_model.state == EGG_GAME_WON) {
-        lv_label_set_text(s_message, "YOU WIN!\n100 EGGS!\n\nPRESS UP OR DOWN");
-        lv_obj_remove_flag(s_message, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(s_message, LV_OBJ_FLAG_HIDDEN);
     } else {
         lv_obj_add_flag(s_message, LV_OBJ_FLAG_HIDDEN);
     }
@@ -946,6 +968,12 @@ void egg_catcher_enter(bool buttons_available, bool battery_available,
     lv_obj_set_style_border_width(s_message, 3, 0);
     lv_obj_set_style_pad_top(s_message, 10, 0);
 
+    s_win_image = lv_image_create(s_screen);
+    lv_image_set_src(s_win_image, &WIN_IMAGE);
+    lv_obj_set_pos(s_win_image, 0, 0);
+    lv_obj_remove_flag(s_win_image, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(s_win_image, LV_OBJ_FLAG_HIDDEN);
+
     refresh_dynamic_objects(now_ms());
     if (!buttons_available) {
         lv_label_set_text(s_message, "BUTTONS NOT FOUND\n\nCHECK THE BOARD");
@@ -999,6 +1027,7 @@ void egg_catcher_exit(void)
     }
 
     s_background = NULL;
+    s_win_image = NULL;
     s_score = NULL;
     s_fox = NULL;
     s_basket_front = NULL;

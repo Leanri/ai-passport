@@ -31,6 +31,12 @@
 - 集成方式：`tools/prepare_egg_fox.py` 按透明区域裁剪，以最近邻采样缩放进 110 × 110 画布，镜像生成左侧动作，并将 LVGL ARGB8888/BGRA 字节写入 `main/assets/egg_game_fox_{left,right}.argb8888`。脚本还会从生成的狐狸动作中提取透明的 27 × 16 手部/篮筐前壁图层，写入 `main/assets/egg_game_basket_front_{left,right}.argb8888`。
 - 重新生成：安装 Pillow 后，在仓库根目录运行 `python tools/prepare_egg_fox.py`。
 
+### 接鸡蛋游戏胜利画面
+
+- 源文件：`images/egg-catcher-win-source.png`，699 × 929 RGBA 图片，由 fork 所有者提供并仅授权在此个人 fork 中使用；不声明更广泛的再分发许可。
+- 集成方式：`tools/prepare_egg_win.py` 将画面居中适配到 240 × 320 屏幕，并把小端 RGB565 像素写入 `main/assets/egg_game_win.rgb565`。游戏会在接住第 100 个鸡蛋后显示它。
+- 重新生成：安装 Pillow 后，在仓库根目录运行 `python tools/prepare_egg_win.py`。
+
 ## 音乐与音效（music）
 
 可复用的音乐与音效源码放在 `music/`。
