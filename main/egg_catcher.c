@@ -58,16 +58,12 @@ static const int8_t FALL_Y[2][EGG_CATCHER_FALL_STEPS] = {
     { 18, 48, 82 },
 };
 
-static const uint32_t WOLF_COLORS[15] = {
-    0xEFDAA5, 0xD3C5A1, 0xA5A397, 0x737C79, 0x4E5959,
-    0x141B1D, 0x33271C, 0x542C15, 0x7B3F1A, 0xA9571F,
-    0xD68730, 0xEFB246, 0xBE2419, 0xF54326, 0xF7E8C2,
-};
-
 extern const uint8_t egg_game_background_start[]
     asm("_binary_egg_game_background_rgb565_start");
-extern const uint8_t egg_game_wolf_start[]
-    asm("_binary_egg_game_wolf_i4_start");
+extern const uint8_t egg_game_wolf_left_start[]
+    asm("_binary_egg_game_wolf_left_argb8888_start");
+extern const uint8_t egg_game_wolf_right_start[]
+    asm("_binary_egg_game_wolf_right_argb8888_start");
 
 static const lv_image_dsc_t BACKGROUND_IMAGE = {
     .header = {
@@ -80,6 +76,22 @@ static const lv_image_dsc_t BACKGROUND_IMAGE = {
     .data_size = GAME_SCREEN_W * GAME_SCREEN_H * 2,
     .data = egg_game_background_start,
 };
+
+#define WOLF_IMAGE(source) \
+    { \
+        .header = { \
+            .magic = LV_IMAGE_HEADER_MAGIC, \
+            .cf = LV_COLOR_FORMAT_ARGB8888, \
+            .w = WOLF_COLOR_W, \
+            .h = WOLF_COLOR_H, \
+            .stride = WOLF_COLOR_W * 4, \
+        }, \
+        .data_size = WOLF_COLOR_W * WOLF_COLOR_H * 4, \
+        .data = source, \
+    }
+
+static const lv_image_dsc_t WOLF_LEFT_IMAGE = WOLF_IMAGE(egg_game_wolf_left_start);
+static const lv_image_dsc_t WOLF_RIGHT_IMAGE = WOLF_IMAGE(egg_game_wolf_right_start);
 
 static const uint16_t EGG_OUTER_MASKS[4][EGG_SPRITE_SIZE] = {
     { 0x0080, 0x01C0, 0x07F0, 0x0FF8, 0x0FF8, 0x1FFC, 0x1FFC, 0x1FFC,
@@ -103,7 +115,6 @@ static const uint16_t EGG_INNER_MASKS[4][EGG_SPRITE_SIZE] = {
       0x1FF0, 0x0FF0, 0x0FE0, 0x0200, 0x0000, 0x0000, 0x0000, 0x0000 },
 };
 
-LV_DRAW_BUF_DEFINE_STATIC(wolf_buf, WOLF_COLOR_W, WOLF_COLOR_H, LV_COLOR_FORMAT_I4);
 LV_DRAW_BUF_DEFINE_STATIC(egg0_buf, EGG_SPRITE_SIZE, EGG_SPRITE_SIZE,
                           LV_COLOR_FORMAT_I4);
 LV_DRAW_BUF_DEFINE_STATIC(egg1_buf, EGG_SPRITE_SIZE, EGG_SPRITE_SIZE,
@@ -277,18 +288,7 @@ static void show_broken_egg(egg_catcher_lane_t lane, bool upper_track,
 
 static void draw_wolf(bool basket_right)
 {
-    clear_sprite(s_wolf, WOLF_COLOR_W, WOLF_COLOR_H);
-    for (int y = 0; y < WOLF_COLOR_H; y++) {
-        for (int x = 0; x < WOLF_COLOR_W; x++) {
-            uint8_t packed = egg_game_wolf_start[y * (WOLF_COLOR_W / 2) + x / 2];
-            uint8_t color = (x & 1) ? packed & 0x0FU : packed >> 4;
-            if (color != PAL_BG) {
-                int draw_x = basket_right ? WOLF_COLOR_W - 1 - x : x;
-                sprite_px(s_wolf, WOLF_COLOR_W, WOLF_COLOR_H,
-                          draw_x, y, color);
-            }
-        }
-    }
+    lv_image_set_src(s_wolf, basket_right ? &WOLF_RIGHT_IMAGE : &WOLF_LEFT_IMAGE);
     lv_obj_set_pos(s_wolf, WOLF_X, WOLF_Y);
     lv_obj_invalidate(s_wolf);
     s_rendered_basket_right = basket_right;
@@ -501,15 +501,7 @@ void egg_catcher_enter(bool buttons_available, bool battery_available)
         lv_obj_remove_flag(s_lives[i], LV_OBJ_FLAG_SCROLLABLE);
     }
 
-    LV_DRAW_BUF_INIT_STATIC(wolf_buf);
-    s_wolf = lv_canvas_create(s_screen);
-    lv_canvas_set_draw_buf(s_wolf, &wolf_buf);
-    lv_canvas_set_palette(s_wolf, PAL_BG,
-                          lv_color_to_32(lv_color_hex(LCD_BG_COLOR), LV_OPA_TRANSP));
-    for (int i = 0; i < 15; i++) {
-        lv_canvas_set_palette(s_wolf, i + 1,
-                              lv_color_to_32(lv_color_hex(WOLF_COLORS[i]), LV_OPA_COVER));
-    }
+    s_wolf = lv_image_create(s_screen);
     lv_obj_remove_flag(s_wolf, LV_OBJ_FLAG_SCROLLABLE);
 
     LV_DRAW_BUF_INIT_STATIC(egg0_buf);
