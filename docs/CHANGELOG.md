@@ -11,6 +11,7 @@
 - Changed basket contact to latch a catch immediately, placed falling eggs behind the basket rim, and added distinct start, catch, shell-break, and game-over sounds through a non-blocking audio worker.
 - Restored the wolf's missing pointed ear silhouette in both poses.
 - Changed Egg Catcher difficulty to clear score tiers at 20 and 40 catches, and gave upper eggs more fall frames so they descend at roughly the same visual speed as lower eggs.
+- Made an egg stay visible in front of the basket opening when contact is made, latch the catch at that moment, then sink behind the basket rim on the next frame.
 
 - Added the supplied 80-byte CW2017 profile for the specified 520 mAh cell, including content/update-flag checks, verified writes, the required restart sequence, and bounded SOC-readiness polling.
 

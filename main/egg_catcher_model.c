@@ -104,22 +104,28 @@ static egg_catcher_event_t move_eggs(egg_catcher_model_t *model)
         if (!egg->active) continue;
 
         if (egg->falling) {
+            uint8_t fall_steps = egg_catcher_model_fall_steps(egg);
+            uint8_t basket_step = fall_steps - 2U;
+
             if (egg->caught) {
-                egg->active = false;
+                if (egg->step < fall_steps - 1U) {
+                    egg->step++;
+                } else {
+                    egg->active = false;
+                }
                 event |= EGG_EVENT_MOVED;
                 continue;
             }
 
             egg->step++;
             event |= EGG_EVENT_MOVED;
-            if (egg->step < egg_catcher_model_fall_steps(egg) - 1) continue;
 
-            if (egg->lane == basket) {
-                /* Latch the catch as soon as the egg reaches the basket. */
+            if (egg->step >= basket_step && egg->lane == basket) {
+                /* Latch at the opening, before the egg sinks behind the rim. */
                 egg->caught = true;
                 model->score++;
                 event |= EGG_EVENT_CAUGHT;
-            } else {
+            } else if (egg->step >= fall_steps - 1U) {
                 egg->active = false;
                 model->last_missed_lane = egg->lane;
                 model->last_missed_upper_track = egg->upper_track;

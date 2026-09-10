@@ -39,7 +39,7 @@ static void test_catch_scores(void)
     assert((event & EGG_EVENT_CAUGHT) == 0);
     assert(egg->active && egg->falling);
     int fall_steps = egg_catcher_model_fall_steps(egg);
-    for (int fall = 1; fall < fall_steps; fall++) {
+    for (int fall = 1; fall < fall_steps - 1; fall++) {
         event = egg_catcher_model_advance(
             &model, egg_catcher_model_move_interval_ms(&model));
     }
@@ -51,6 +51,12 @@ static void test_catch_scores(void)
     /* Moving away after contact must not turn an already caught egg into a miss. */
     model.basket_right = egg->lane != EGG_LANE_RIGHT;
     model.spawn_elapsed_ms = 0;
+    event = egg_catcher_model_advance(
+        &model, egg_catcher_model_move_interval_ms(&model));
+    assert(egg->active && egg->caught);
+    assert(egg->step == fall_steps - 1);
+    assert((event & EGG_EVENT_MISSED) == 0);
+
     event = egg_catcher_model_advance(
         &model, egg_catcher_model_move_interval_ms(&model));
     assert(!egg->active);

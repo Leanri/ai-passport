@@ -162,6 +162,7 @@ static uint64_t s_last_press_ms[3];
 static uint32_t s_rendered_score;
 static uint8_t s_rendered_misses;
 static bool s_press_seen[3];
+static bool s_egg_foreground[EGG_CATCHER_MAX_EGGS];
 static bool s_audio_available;
 static bool s_battery_available;
 static bool s_wolf_drawn;
@@ -447,6 +448,19 @@ static void draw_wolf(bool basket_right)
     s_wolf_drawn = true;
 }
 
+static void set_egg_foreground(int index, bool foreground)
+{
+    if (s_egg_foreground[index] == foreground) return;
+
+    if (foreground) {
+        lv_obj_move_foreground(s_egg_objects[index]);
+    } else {
+        lv_obj_move_background(s_egg_objects[index]);
+        lv_obj_move_background(s_background);
+    }
+    s_egg_foreground[index] = foreground;
+}
+
 static void refresh_dynamic_objects(void)
 {
     if (s_rendered_score != s_model.score) {
@@ -469,6 +483,7 @@ static void refresh_dynamic_objects(void)
         const egg_catcher_egg_t *egg = &s_model.eggs[i];
         lv_obj_t *object = s_egg_objects[i];
         if (!egg->active) {
+            set_egg_foreground(i, false);
             lv_obj_add_flag(object, LV_OBJ_FLAG_HIDDEN);
             continue;
         }
@@ -480,12 +495,14 @@ static void refresh_dynamic_objects(void)
             uint8_t fall_steps = egg_catcher_model_fall_steps(egg);
             uint8_t fall_step = egg->step < fall_steps
                                     ? egg->step : fall_steps - 1;
+            set_egg_foreground(i, fall_step == fall_steps - 2U);
             int direction = egg->lane == EGG_LANE_LEFT ? 1 : -1;
             x = TRACK_END[egg->lane][track].x +
                 direction * FALL_X[track][fall_step];
             y = TRACK_END[egg->lane][track].y + FALL_Y[track][fall_step];
             frame = (uint8_t)(EGG_CATCHER_LANE_STEPS + fall_step);
         } else {
+            set_egg_foreground(i, false);
             game_point_t start = TRACK_START[egg->lane][track];
             game_point_t end = TRACK_END[egg->lane][track];
             int divisor = EGG_CATCHER_LANE_STEPS - 1;
@@ -634,6 +651,9 @@ void egg_catcher_enter(bool buttons_available, bool battery_available,
     for (int i = 0; i < 3; i++) {
         s_last_press_ms[i] = 0;
         s_press_seen[i] = false;
+    }
+    for (int i = 0; i < EGG_CATCHER_MAX_EGGS; i++) {
+        s_egg_foreground[i] = false;
     }
     s_wolf_drawn = false;
     s_rendered_score = UINT32_MAX;
