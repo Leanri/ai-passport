@@ -48,21 +48,40 @@ static void test_catch_scores(void)
     assert(model.score == 1);
     assert(model.misses == 0);
 
-    /* Moving away after contact must not turn an already caught egg into a miss. */
+    /* After one visible contact frame, the caught egg is consumed immediately.
+     * Moving away must not turn it into a miss or let it keep falling. */
     model.basket_right = egg->lane != EGG_LANE_RIGHT;
     model.spawn_elapsed_ms = 0;
-    event = egg_catcher_model_advance(
-        &model, egg_catcher_model_move_interval_ms(&model));
-    assert(egg->active && egg->caught);
-    assert(egg->step == fall_steps - 1);
-    assert((event & EGG_EVENT_MISSED) == 0);
-
     event = egg_catcher_model_advance(
         &model, egg_catcher_model_move_interval_ms(&model));
     assert(!egg->active);
     assert((event & EGG_EVENT_MISSED) == 0);
     assert(model.score == 1);
     assert(model.misses == 0);
+}
+
+static void test_caught_egg_never_falls_below_basket(void)
+{
+    for (int upper = 0; upper <= 1; upper++) {
+        egg_catcher_model_t model;
+        egg_catcher_model_init(&model, (uint32_t)(70 + upper));
+        egg_catcher_model_start(&model);
+        egg_catcher_egg_t *egg = first_egg(&model);
+        assert(egg != NULL);
+
+        egg->upper_track = upper != 0;
+        egg->falling = true;
+        egg->caught = true;
+        egg->step = (uint8_t)(egg_catcher_model_fall_steps(egg) - 2U);
+        uint8_t contact_step = egg->step;
+
+        egg_catcher_event_t event = egg_catcher_model_advance(
+            &model, egg_catcher_model_move_interval_ms(&model));
+        assert(!egg->active);
+        assert(egg->step == contact_step);
+        assert((event & EGG_EVENT_MOVED) != 0);
+        assert((event & EGG_EVENT_MISSED) == 0);
+    }
 }
 
 static void test_three_misses_end_game(void)
@@ -253,6 +272,7 @@ int main(void)
 {
     test_initial_state_and_controls();
     test_catch_scores();
+    test_caught_egg_never_falls_below_basket();
     test_three_misses_end_game();
     test_missed_egg_stays_visible_while_falling();
     test_difficulty();

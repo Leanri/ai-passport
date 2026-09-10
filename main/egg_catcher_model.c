@@ -108,11 +108,10 @@ static egg_catcher_event_t move_eggs(egg_catcher_model_t *model)
             uint8_t basket_step = fall_steps - 2U;
 
             if (egg->caught) {
-                if (egg->step < fall_steps - 1U) {
-                    egg->step++;
-                } else {
-                    egg->active = false;
-                }
+                /* The contact frame was already shown at the basket opening.
+                 * Consume the egg now instead of drawing another fall step
+                 * below a basket whose transparent outline may expose it. */
+                egg->active = false;
                 event |= EGG_EVENT_MOVED;
                 continue;
             }

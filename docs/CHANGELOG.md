@@ -16,6 +16,7 @@
 - Added six gradual speed increases at every 15 catches and a 100-egg victory screen with a short win sound and restart prompt.
 - Restored the lower button's dedicated role: hold `OK` to leave Egg Catcher for its title screen, while only `UP` and `DOWN` control the basket.
 - Replaced the wolf with the user-supplied orange fox, preserving its scarf, outfit, tail, and basket in mirrored 110 × 110 pixel poses.
+- Stopped caught eggs after their visible basket-contact frame so they no longer continue falling below the basket.
 
 - Added the supplied 80-byte CW2017 profile for the specified 520 mAh cell, including content/update-flag checks, verified writes, the required restart sequence, and bounded SOC-readiness polling.
 
