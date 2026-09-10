@@ -7,7 +7,7 @@
 ## Unreleased
 
 - Added the user-supplied full-screen victory artwork shown immediately after the fox catches the hundredth egg.
-- Restored the standard FoloToy AI Passport main menu and added Egg Catcher as a normal menu item; holding `OK` in the game now returns to the system menu instead of a game-only title screen.
+- Removed the interim FoloToy demo menu so the standalone Egg Catcher game begins immediately at power-on.
 - Added transparent mirrored hand/basket-front layers and a fixed 180 ms catch animation: the egg remains fully visible for 90 ms, sinks no more than four pixels behind the basket front for 90 ms, and then disappears without any below-basket frame.
 - Made each 15-egg difficulty step visibly stronger while keeping one shared movement speed for both tracks, and added a `SPEED UP!` cue at every threshold.
 

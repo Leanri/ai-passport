@@ -854,6 +854,7 @@ void egg_catcher_enter(bool buttons_available, bool battery_available,
     s_audio_available = audio_available;
     s_battery_available = battery_available;
     egg_catcher_model_init(&s_model, (uint32_t)esp_timer_get_time());
+    egg_catcher_model_start(&s_model);
     s_input_queue = xQueueCreate(8, sizeof(game_input_t));
     if (!s_input_queue) ESP_LOGE(TAG, "input queue allocation failed");
     for (int i = 0; i < 3; i++) {
@@ -1004,6 +1005,8 @@ void egg_catcher_enter(bool buttons_available, bool battery_available,
             s_audio_available = false;
         }
     }
+
+    queue_sound(GAME_SOUND_START);
 
     log_runtime_health("ready");
 }
