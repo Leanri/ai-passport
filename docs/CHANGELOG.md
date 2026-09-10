@@ -10,6 +10,7 @@
 - Restored the Egg Catcher background's original thin chutes without the duplicate overpaint, completed the wolf's missing rear foot in both poses, reduced repeated LVGL label updates, and added periodic memory/stack diagnostics plus a one-hour model stress test for restart investigation.
 - Changed basket contact to latch a catch immediately, placed falling eggs behind the basket rim, and added distinct start, catch, shell-break, and game-over sounds through a non-blocking audio worker.
 - Restored the wolf's missing pointed ear silhouette in both poses.
+- Changed Egg Catcher difficulty to clear score tiers at 20 and 40 catches, and gave upper eggs more fall frames so they descend at roughly the same visual speed as lower eggs.
 
 - Added the supplied 80-byte CW2017 profile for the specified 520 mAh cell, including content/update-flag checks, verified writes, the required restart sequence, and bounded SOC-readiness polling.
 

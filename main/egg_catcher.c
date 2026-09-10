@@ -65,10 +65,13 @@ static const game_point_t TRACK_END[EGG_CATCHER_LANE_COUNT][2] = {
     { { 78, 240 }, { 78, 198 } },
     { { 162, 240 }, { 162, 198 } },
 };
-static const int8_t FALL_X[EGG_CATCHER_FALL_STEPS] = { 2, 6, 10 };
-static const int8_t FALL_Y[2][EGG_CATCHER_FALL_STEPS] = {
-    { 10, 27, 47 },
-    { 18, 48, 82 },
+static const int8_t FALL_X[2][EGG_CATCHER_UPPER_FALL_STEPS] = {
+    { 2, 6, 10, 10, 10 },
+    { 2, 4, 6, 8, 10 },
+};
+static const int8_t FALL_Y[2][EGG_CATCHER_UPPER_FALL_STEPS] = {
+    { 10, 27, 47, 47, 47 },
+    { 16, 33, 49, 66, 82 },
 };
 
 extern const uint8_t egg_game_background_start[]
@@ -423,10 +426,12 @@ static void show_broken_egg(egg_catcher_lane_t lane, bool upper_track,
 
     int direction = lane == EGG_LANE_LEFT ? 1 : -1;
     int track = upper_track ? 1 : 0;
+    int final_step = upper_track ? EGG_CATCHER_UPPER_FALL_STEPS - 1
+                                 : EGG_CATCHER_LOWER_FALL_STEPS - 1;
     int impact_x = TRACK_END[lane][track].x +
-                   direction * FALL_X[EGG_CATCHER_FALL_STEPS - 1];
+                   direction * FALL_X[track][final_step];
     int impact_y = TRACK_END[lane][track].y +
-                   FALL_Y[track][EGG_CATCHER_FALL_STEPS - 1];
+                   FALL_Y[track][final_step];
     lv_obj_set_pos(s_break, impact_x - BREAK_SPRITE_W / 2, impact_y - 7);
     lv_obj_remove_flag(s_break, LV_OBJ_FLAG_HIDDEN);
     lv_obj_invalidate(s_break);
@@ -472,10 +477,12 @@ static void refresh_dynamic_objects(void)
         uint8_t frame;
         int track = egg->upper_track ? 1 : 0;
         if (egg->falling) {
-            uint8_t fall_step = egg->step < EGG_CATCHER_FALL_STEPS
-                                    ? egg->step : EGG_CATCHER_FALL_STEPS - 1;
+            uint8_t fall_steps = egg_catcher_model_fall_steps(egg);
+            uint8_t fall_step = egg->step < fall_steps
+                                    ? egg->step : fall_steps - 1;
             int direction = egg->lane == EGG_LANE_LEFT ? 1 : -1;
-            x = TRACK_END[egg->lane][track].x + direction * FALL_X[fall_step];
+            x = TRACK_END[egg->lane][track].x +
+                direction * FALL_X[track][fall_step];
             y = TRACK_END[egg->lane][track].y + FALL_Y[track][fall_step];
             frame = (uint8_t)(EGG_CATCHER_LANE_STEPS + fall_step);
         } else {

@@ -19,14 +19,22 @@ egg_catcher_lane_t egg_catcher_model_basket_lane(const egg_catcher_model_t *mode
 
 uint32_t egg_catcher_model_move_interval_ms(const egg_catcher_model_t *model)
 {
-    uint32_t reduction = model->score > 24U ? 192U : model->score * 8U;
-    return 360U - reduction;
+    if (model->score >= 40U) return 240U;
+    if (model->score >= 20U) return 300U;
+    return 360U;
 }
 
 uint32_t egg_catcher_model_spawn_interval_ms(const egg_catcher_model_t *model)
 {
-    uint32_t reduction = model->score > 24U ? 480U : model->score * 20U;
-    return 1000U - reduction;
+    if (model->score >= 40U) return 700U;
+    if (model->score >= 20U) return 850U;
+    return 1000U;
+}
+
+uint8_t egg_catcher_model_fall_steps(const egg_catcher_egg_t *egg)
+{
+    return egg->upper_track ? EGG_CATCHER_UPPER_FALL_STEPS
+                            : EGG_CATCHER_LOWER_FALL_STEPS;
 }
 
 static bool spawn_egg(egg_catcher_model_t *model)
@@ -104,7 +112,7 @@ static egg_catcher_event_t move_eggs(egg_catcher_model_t *model)
 
             egg->step++;
             event |= EGG_EVENT_MOVED;
-            if (egg->step < EGG_CATCHER_FALL_STEPS - 1) continue;
+            if (egg->step < egg_catcher_model_fall_steps(egg) - 1) continue;
 
             if (egg->lane == basket) {
                 /* Latch the catch as soon as the egg reaches the basket. */

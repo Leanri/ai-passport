@@ -6,7 +6,8 @@
 #define EGG_CATCHER_LANE_COUNT 2
 #define EGG_CATCHER_MAX_EGGS   2
 #define EGG_CATCHER_LANE_STEPS 7
-#define EGG_CATCHER_FALL_STEPS 3
+#define EGG_CATCHER_LOWER_FALL_STEPS 3
+#define EGG_CATCHER_UPPER_FALL_STEPS 5
 #define EGG_CATCHER_MAX_MISSES 3
 
 typedef enum {
@@ -60,3 +61,4 @@ egg_catcher_event_t egg_catcher_model_advance(egg_catcher_model_t *model,
                                                uint32_t elapsed_ms);
 uint32_t egg_catcher_model_move_interval_ms(const egg_catcher_model_t *model);
 uint32_t egg_catcher_model_spawn_interval_ms(const egg_catcher_model_t *model);
+uint8_t egg_catcher_model_fall_steps(const egg_catcher_egg_t *egg);

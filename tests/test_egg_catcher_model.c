@@ -38,7 +38,8 @@ static void test_catch_scores(void)
         &model, egg_catcher_model_move_interval_ms(&model));
     assert((event & EGG_EVENT_CAUGHT) == 0);
     assert(egg->active && egg->falling);
-    for (int fall = 1; fall < EGG_CATCHER_FALL_STEPS; fall++) {
+    int fall_steps = egg_catcher_model_fall_steps(egg);
+    for (int fall = 1; fall < fall_steps; fall++) {
         event = egg_catcher_model_advance(
             &model, egg_catcher_model_move_interval_ms(&model));
     }
@@ -82,7 +83,8 @@ static void test_three_misses_end_game(void)
         assert(egg->active);
         assert(egg->falling);
 
-        for (int fall = 1; fall < EGG_CATCHER_FALL_STEPS; fall++) {
+        int fall_steps = egg_catcher_model_fall_steps(egg);
+        for (int fall = 1; fall < fall_steps; fall++) {
             event = egg_catcher_model_advance(
                 &model, egg_catcher_model_move_interval_ms(&model));
         }
@@ -109,7 +111,8 @@ static void test_missed_egg_stays_visible_while_falling(void)
     assert((event & EGG_EVENT_MISSED) == 0);
     assert(egg->active && egg->falling && egg->step == 0);
 
-    for (int step = 1; step < EGG_CATCHER_FALL_STEPS - 1; step++) {
+    int fall_steps = egg_catcher_model_fall_steps(egg);
+    for (int step = 1; step < fall_steps - 1; step++) {
         event = egg_catcher_model_advance(
             &model, egg_catcher_model_move_interval_ms(&model));
         assert((event & EGG_EVENT_MISSED) == 0);
@@ -129,9 +132,30 @@ static void test_difficulty(void)
     egg_catcher_model_init(&model, 33);
     egg_catcher_model_start(&model);
 
-    model.score = 100;
-    assert(egg_catcher_model_move_interval_ms(&model) == 168);
-    assert(egg_catcher_model_spawn_interval_ms(&model) == 520);
+    model.score = 19;
+    assert(egg_catcher_model_move_interval_ms(&model) == 360);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 1000);
+
+    model.score = 20;
+    assert(egg_catcher_model_move_interval_ms(&model) == 300);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 850);
+
+    model.score = 39;
+    assert(egg_catcher_model_move_interval_ms(&model) == 300);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 850);
+
+    model.score = 40;
+    assert(egg_catcher_model_move_interval_ms(&model) == 240);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 700);
+}
+
+static void test_upper_eggs_get_more_fall_frames(void)
+{
+    egg_catcher_egg_t egg = { 0 };
+    assert(egg_catcher_model_fall_steps(&egg) == EGG_CATCHER_LOWER_FALL_STEPS);
+
+    egg.upper_track = true;
+    assert(egg_catcher_model_fall_steps(&egg) == EGG_CATCHER_UPPER_FALL_STEPS);
 }
 
 static void test_long_running_session_stays_bounded(void)
@@ -156,8 +180,9 @@ static void test_long_running_session_stays_bounded(void)
             const egg_catcher_egg_t *egg = &model.eggs[i];
             if (!egg->active) continue;
             assert(egg->lane < EGG_CATCHER_LANE_COUNT);
-            assert(egg->step < (egg->falling ? EGG_CATCHER_FALL_STEPS
-                                             : EGG_CATCHER_LANE_STEPS));
+            assert(egg->step < (egg->falling
+                                    ? egg_catcher_model_fall_steps(egg)
+                                    : EGG_CATCHER_LANE_STEPS));
         }
     }
     assert(model.score > 100);
@@ -170,6 +195,7 @@ int main(void)
     test_three_misses_end_game();
     test_missed_egg_stays_visible_while_falling();
     test_difficulty();
+    test_upper_eggs_get_more_fall_frames();
     test_long_running_session_stays_bounded();
     puts("egg_catcher_model: all tests passed");
     return 0;
