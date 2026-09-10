@@ -162,32 +162,32 @@ static void test_difficulty(void)
     assert(egg_catcher_model_spawn_interval_ms(&model) == 1000);
 
     model.score = 15;
-    assert(egg_catcher_model_move_interval_ms(&model) == 330);
-    assert(egg_catcher_model_spawn_interval_ms(&model) == 930);
+    assert(egg_catcher_model_move_interval_ms(&model) == 300);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 850);
 
     model.score = 30;
-    assert(egg_catcher_model_move_interval_ms(&model) == 300);
-    assert(egg_catcher_model_spawn_interval_ms(&model) == 860);
+    assert(egg_catcher_model_move_interval_ms(&model) == 260);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 740);
 
     model.score = 45;
-    assert(egg_catcher_model_move_interval_ms(&model) == 270);
-    assert(egg_catcher_model_spawn_interval_ms(&model) == 790);
+    assert(egg_catcher_model_move_interval_ms(&model) == 230);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 650);
 
     model.score = 60;
-    assert(egg_catcher_model_move_interval_ms(&model) == 240);
-    assert(egg_catcher_model_spawn_interval_ms(&model) == 720);
+    assert(egg_catcher_model_move_interval_ms(&model) == 210);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 580);
 
     model.score = 75;
-    assert(egg_catcher_model_move_interval_ms(&model) == 210);
-    assert(egg_catcher_model_spawn_interval_ms(&model) == 650);
+    assert(egg_catcher_model_move_interval_ms(&model) == 195);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 520);
 
     model.score = 90;
     assert(egg_catcher_model_move_interval_ms(&model) == 180);
-    assert(egg_catcher_model_spawn_interval_ms(&model) == 580);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 470);
 
     model.score = EGG_CATCHER_WIN_SCORE;
     assert(egg_catcher_model_move_interval_ms(&model) == 180);
-    assert(egg_catcher_model_spawn_interval_ms(&model) == 580);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 470);
 }
 
 static void test_upper_eggs_get_more_fall_frames(void)

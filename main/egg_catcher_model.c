@@ -19,16 +19,22 @@ egg_catcher_lane_t egg_catcher_model_basket_lane(const egg_catcher_model_t *mode
 
 uint32_t egg_catcher_model_move_interval_ms(const egg_catcher_model_t *model)
 {
+    static const uint16_t interval_ms[] = {
+        360U, 300U, 260U, 230U, 210U, 195U, 180U,
+    };
     uint32_t level = model->score / 15U;
     if (level > 6U) level = 6U;
-    return 360U - level * 30U;
+    return interval_ms[level];
 }
 
 uint32_t egg_catcher_model_spawn_interval_ms(const egg_catcher_model_t *model)
 {
+    static const uint16_t interval_ms[] = {
+        1000U, 850U, 740U, 650U, 580U, 520U, 470U,
+    };
     uint32_t level = model->score / 15U;
     if (level > 6U) level = 6U;
-    return 1000U - level * 70U;
+    return interval_ms[level];
 }
 
 uint8_t egg_catcher_model_fall_steps(const egg_catcher_egg_t *egg)

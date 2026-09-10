@@ -785,7 +785,12 @@ static void timer_cb(lv_timer_t *timer)
         refresh_dynamic_objects(time_ms);
     }
     if (event & EGG_EVENT_CAUGHT) {
-        show_feedback("CATCH!", UI_GRASS_DARK, time_ms);
+        if (s_model.score < EGG_CATCHER_WIN_SCORE &&
+            s_model.score % 15U == 0U) {
+            show_feedback("SPEED UP!", UI_RED, time_ms);
+        } else {
+            show_feedback("CATCH!", UI_GRASS_DARK, time_ms);
+        }
         queue_sound(GAME_SOUND_CATCH);
     }
     if (event & EGG_EVENT_MISSED) {
