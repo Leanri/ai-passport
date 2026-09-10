@@ -71,6 +71,8 @@ static void test_three_misses_end_game(void)
             egg = first_egg(&model);
         }
         assert(egg != NULL);
+        egg_catcher_lane_t missed_lane = egg->lane;
+        bool missed_upper_track = egg->upper_track;
         model.basket_right = egg->lane != EGG_LANE_RIGHT;
         egg->step = EGG_CATCHER_LANE_STEPS - 1;
         egg_catcher_event_t event = egg_catcher_model_advance(
@@ -84,8 +86,8 @@ static void test_three_misses_end_game(void)
                 &model, egg_catcher_model_move_interval_ms(&model));
         }
         assert((event & EGG_EVENT_MISSED) != 0);
-        assert(model.last_missed_lane == egg->lane);
-        assert(model.last_missed_upper_track == egg->upper_track);
+        assert(model.last_missed_lane == missed_lane);
+        assert(model.last_missed_upper_track == missed_upper_track);
     }
     assert(model.misses == EGG_CATCHER_MAX_MISSES);
     assert(model.state == EGG_GAME_OVER);
