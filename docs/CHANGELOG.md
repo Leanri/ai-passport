@@ -6,7 +6,7 @@
 
 ## Unreleased
 
-- Added the standalone Egg Catcher game: two-lane egg movement, direct two-button left/right controls, score, misses, restart flow, increasing difficulty, battery status, compact reference-derived pixel silhouettes, and host-tested game logic.
+- Added the standalone Egg Catcher game: two-lane egg movement, direct two-button left/right controls, score, misses, restart flow, increasing difficulty, battery status, two distinct reference-derived wolf poses, detailed hens, chutes, houses and shrubs, and host-tested game logic.
 
 - Added the supplied 80-byte CW2017 profile for the specified 520 mAh cell, including content/update-flag checks, verified writes, the required restart sequence, and bounded SOC-readiness polling.
 

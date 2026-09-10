@@ -12,21 +12,23 @@
 
 #define GAME_CANVAS_W 216
 #define GAME_CANVAS_H 236
-#define WOLF_LEFT_X   64
-#define WOLF_RIGHT_X  96
-#define WOLF_Y        143
+#define WOLF_LEFT_X   56
+#define WOLF_RIGHT_X  80
+#define WOLF_Y        109
 #define GAME_TIMER_PERIOD_MS 30
 
 #define LCD_BG_COLOR 0xB8C6A3
 #define LCD_INK_COLOR 0x17251D
 #define LCD_RED_COLOR 0xD74A34
 #define LCD_HI_COLOR 0xE8EEDC
+#define LCD_GRASS_COLOR 0x207636
 
 enum {
     PAL_BG = 0,
     PAL_INK,
     PAL_RED,
     PAL_HI,
+    PAL_GRASS,
 };
 
 typedef struct {
@@ -42,10 +44,10 @@ typedef struct {
 static const char *TAG = "egg_game";
 
 static const game_point_t LANE_START[EGG_CATCHER_LANE_COUNT] = {
-    { 24, 70 }, { 192, 70 },
+    { 22, 78 }, { 194, 78 },
 };
 static const game_point_t LANE_END[EGG_CATCHER_LANE_COUNT] = {
-    { 78, 140 }, { 138, 140 },
+    { 72, 142 }, { 144, 142 },
 };
 
 LV_DRAW_BUF_DEFINE_STATIC(game_buf, GAME_CANVAS_W, GAME_CANVAS_H, LV_COLOR_FORMAT_I4);
@@ -117,6 +119,23 @@ static void canvas_thick_line(int x0, int y0, int x1, int y1, uint8_t color)
     canvas_line(x0 + 1, y0, x1 + 1, y1, color);
 }
 
+static void canvas_rect(int x, int y, int width, int height, uint8_t color)
+{
+    for (int py = 0; py < height; py++) {
+        for (int px = 0; px < width; px++) canvas_px(x + px, y + py, color);
+    }
+}
+
+static void canvas_filled_circle(int cx, int cy, int radius, uint8_t color)
+{
+    int outer = radius * radius;
+    for (int y = -radius; y <= radius; y++) {
+        for (int x = -radius; x <= radius; x++) {
+            if (x * x + y * y <= outer) canvas_px(cx + x, cy + y, color);
+        }
+    }
+}
+
 static bool mask_pixel(const uint8_t *mask, int width, int x, int y)
 {
     int stride = (width + 7) / 8;
@@ -128,20 +147,21 @@ static void draw_ramp(egg_catcher_lane_t lane)
     game_point_t start = LANE_START[lane];
     game_point_t end = LANE_END[lane];
     int direction = end.x > start.x ? 1 : -1;
-    canvas_thick_line(start.x, start.y + 8, end.x, end.y + 8, PAL_RED);
-    canvas_thick_line(start.x, start.y + 13, end.x, end.y + 13, PAL_RED);
+    canvas_thick_line(start.x, start.y, end.x, end.y, PAL_RED);
+    canvas_thick_line(start.x, start.y + 7, end.x, end.y + 7, PAL_RED);
     for (int i = 0; i < 4; i++) {
         int x = start.x + (end.x - start.x) * i / 3;
-        int y = start.y + 10 + (end.y - start.y) * i / 3;
-        canvas_line(x, y - 3, x + direction * 5, y + 7, PAL_RED);
+        int y = start.y + (end.y - start.y) * i / 3;
+        canvas_line(x, y + 2, x + direction * 5, y + 10, PAL_RED);
     }
 }
 
 static void draw_chicken(bool facing_right, int x, int y)
 {
     static const game_point_t red_pixels[] = {
-        { 0, 7 }, { 1, 7 }, { 2, 7 },
-        { 7, 1 }, { 8, 0 }, { 9, 1 }, { 11, 1 }, { 5, 9 },
+        { 6, 5 }, { 7, 4 }, { 7, 5 }, { 7, 6 },
+        { 11, 1 }, { 12, 0 }, { 12, 1 }, { 13, 1 },
+        { 8, 8 }, { 9, 8 },
     };
 
     for (int sy = 0; sy < EGG_CHICKEN_SPRITE_HEIGHT; sy++) {
@@ -171,6 +191,7 @@ static void wolf_px(int x, int y, uint8_t color)
 
 static void draw_wolf(bool basket_right)
 {
+    const uint8_t *mask = basket_right ? egg_wolf_right_mask : egg_wolf_left_mask;
     for (int y = 0; y < EGG_WOLF_SPRITE_HEIGHT; y++) {
         for (int x = 0; x < EGG_WOLF_SPRITE_WIDTH; x++) {
             wolf_px(x, y, PAL_BG);
@@ -178,9 +199,7 @@ static void draw_wolf(bool basket_right)
     }
     for (int y = 0; y < EGG_WOLF_SPRITE_HEIGHT; y++) {
         for (int x = 0; x < EGG_WOLF_SPRITE_WIDTH; x++) {
-            if (!mask_pixel(egg_wolf_mask, EGG_WOLF_SPRITE_WIDTH, x, y)) continue;
-            int dx = basket_right ? EGG_WOLF_SPRITE_WIDTH - 1 - x : x;
-            wolf_px(dx, y, PAL_INK);
+            if (mask_pixel(mask, EGG_WOLF_SPRITE_WIDTH, x, y)) wolf_px(x, y, PAL_INK);
         }
     }
     lv_obj_set_pos(s_wolf,
@@ -191,16 +210,55 @@ static void draw_wolf(bool basket_right)
     s_wolf_drawn = true;
 }
 
+static void draw_bush(int x, int y)
+{
+    static const game_point_t crowns[] = {
+        { 7, 9 }, { 15, 6 }, { 24, 8 }, { 32, 6 }, { 39, 10 },
+    };
+    static const uint8_t radii[] = { 7, 8, 9, 8, 7 };
+    for (size_t i = 0; i < sizeof(radii) / sizeof(radii[0]); i++) {
+        canvas_filled_circle(x + crowns[i].x, y + crowns[i].y, radii[i], PAL_GRASS);
+    }
+    canvas_rect(x + 4, y + 8, 38, 9, PAL_GRASS);
+}
+
+static void draw_grass_patch(int x, int width)
+{
+    canvas_rect(x, 203, width, 3, PAL_GRASS);
+    for (int blade = 0; blade < width; blade += 7) {
+        canvas_thick_line(x + blade, 203, x + blade + 3, 200, PAL_GRASS);
+    }
+}
+
+static void draw_house_details(void)
+{
+    canvas_thick_line(0, 54, 16, 34, PAL_RED);
+    canvas_thick_line(16, 34, 31, 54, PAL_RED);
+    canvas_thick_line(23, 41, 36, 41, PAL_RED);
+    canvas_thick_line(36, 41, 36, 58, PAL_RED);
+    canvas_thick_line(25, 45, 35, 45, PAL_RED);
+    canvas_thick_line(25, 50, 35, 50, PAL_RED);
+    canvas_thick_line(25, 55, 35, 55, PAL_RED);
+}
+
 static void draw_static_scene(void)
 {
     if (!s_canvas) return;
     lv_canvas_fill_bg(s_canvas, lv_color_hex(LCD_BG_COLOR), LV_OPA_COVER);
-    canvas_line(52, 34, 164, 34, PAL_INK);
+    draw_house_details();
+    draw_bush(169, 35);
     for (int lane = 0; lane < EGG_CATCHER_LANE_COUNT; lane++) {
         draw_ramp((egg_catcher_lane_t)lane);
     }
-    draw_chicken(true, 2, 44);
-    draw_chicken(false, 186, 44);
+    draw_bush(0, 126);
+    draw_bush(171, 126);
+    draw_grass_patch(6, 31);
+    draw_grass_patch(61, 24);
+    draw_grass_patch(92, 33);
+    draw_grass_patch(128, 20);
+    draw_grass_patch(176, 34);
+    draw_chicken(true, 0, 54);
+    draw_chicken(false, 180, 54);
     lv_obj_invalidate(s_canvas);
 }
 
@@ -360,6 +418,8 @@ void egg_catcher_enter(bool buttons_available, bool battery_available)
                           lv_color_to_32(lv_color_hex(LCD_RED_COLOR), LV_OPA_COVER));
     lv_canvas_set_palette(s_canvas, PAL_HI,
                           lv_color_to_32(lv_color_hex(LCD_HI_COLOR), LV_OPA_COVER));
+    lv_canvas_set_palette(s_canvas, PAL_GRASS,
+                          lv_color_to_32(lv_color_hex(LCD_GRASS_COLOR), LV_OPA_COVER));
     lv_obj_set_pos(s_canvas, 12, 54);
 
     s_score = ui_pixel_label(s_screen, "0000", &lv_font_montserrat_20, LCD_INK_COLOR);
