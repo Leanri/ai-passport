@@ -11,6 +11,8 @@ A compact egg-catching game inspired by classic handheld LCD games. It runs dire
 - `UP`: turn the wolf and basket to the left chicken.
 - `DOWN`: turn the wolf and basket to the right chicken.
 - Press either button on the start or game-over screen to play.
+- Hold `OK`: leave the game and return to the title screen.
+- Press `OK` on the title screen to play again.
 
 The game keeps score, allows three misses, accelerates as the score rises, and shows battery percentage when the fuel gauge is available.
 
@@ -19,7 +21,7 @@ The game keeps score, allows three misses, accelerates as the score rises, and s
 - FoloToy AI Passport with ESP32-C3
 - 8 MB Flash, no PSRAM
 - 240 × 320 ST7789P3 display
-- Two exposed ADC buttons (`UP` and `DOWN`)
+- Three ADC buttons (`UP`, `DOWN`, and `OK`)
 
 The original 3 MB application limit and protected `cardid` partition at `0x356000` remain unchanged. Never erase the entire Flash of a provisioned device.
 

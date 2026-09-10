@@ -54,6 +54,7 @@ typedef enum {
     GAME_SOUND_BREAK,
     GAME_SOUND_OVER,
     GAME_SOUND_WIN,
+    GAME_SOUND_STOP,
 } game_sound_t;
 
 static const char *TAG = "egg_game";
@@ -154,6 +155,7 @@ static lv_timer_t *s_timer;
 static QueueHandle_t s_input_queue;
 static QueueHandle_t s_sound_queue;
 static TaskHandle_t s_sound_task;
+static TaskHandle_t s_sound_stop_waiter;
 static uint64_t s_last_tick_ms;
 static uint64_t s_feedback_until_ms;
 static uint64_t s_break_until_ms;
@@ -168,6 +170,7 @@ static bool s_audio_available;
 static bool s_battery_available;
 static bool s_wolf_drawn;
 static bool s_rendered_basket_right;
+static volatile bool s_sound_stop_requested;
 
 static uint64_t now_ms(void)
 {
@@ -176,6 +179,7 @@ static uint64_t now_ms(void)
 
 static bool write_pcm(const int16_t *samples, size_t count)
 {
+    if (s_sound_stop_requested) return false;
     if (bsp_audio_write(samples, count * sizeof(samples[0])) == ESP_OK) return true;
     ESP_LOGW(TAG, "sound write failed");
     return false;
@@ -190,6 +194,7 @@ static bool play_tone_sweep(uint16_t start_hz, uint16_t end_hz,
     uint32_t total = GAME_AUDIO_SAMPLE_RATE * duration_ms / 1000U;
 
     for (uint32_t offset = 0; offset < total;) {
+        if (s_sound_stop_requested) return false;
         size_t count = total - offset;
         if (count > GAME_AUDIO_CHUNK_SAMPLES) count = GAME_AUDIO_CHUNK_SAMPLES;
         for (size_t i = 0; i < count; i++) {
@@ -220,6 +225,7 @@ static bool play_crack(void)
     uint32_t total = GAME_AUDIO_SAMPLE_RATE * 90U / 1000U;
 
     for (uint32_t offset = 0; offset < total;) {
+        if (s_sound_stop_requested) return false;
         size_t count = total - offset;
         if (count > GAME_AUDIO_CHUNK_SAMPLES) count = GAME_AUDIO_CHUNK_SAMPLES;
         for (size_t i = 0; i < count; i++) {
@@ -243,7 +249,9 @@ static void audio_task(void *arg)
     if (bsp_audio_set_format(GAME_AUDIO_SAMPLE_RATE, 16, 1) != ESP_OK) {
         ESP_LOGE(TAG, "game sound format setup failed");
         s_audio_available = false;
+        TaskHandle_t waiter = s_sound_stop_waiter;
         s_sound_task = NULL;
+        if (waiter) xTaskNotifyGive(waiter);
         vTaskDelete(NULL);
         return;
     }
@@ -252,6 +260,7 @@ static void audio_task(void *arg)
     for (;;) {
         game_sound_t sound;
         if (xQueueReceive(s_sound_queue, &sound, portMAX_DELAY) != pdTRUE) continue;
+        if (sound == GAME_SOUND_STOP || s_sound_stop_requested) break;
         switch (sound) {
             case GAME_SOUND_START:
                 (void)play_tone_sweep(520, 820, 80, 5000);
@@ -273,6 +282,11 @@ static void audio_task(void *arg)
                 break;
         }
     }
+
+    TaskHandle_t waiter = s_sound_stop_waiter;
+    s_sound_task = NULL;
+    if (waiter) xTaskNotifyGive(waiter);
+    vTaskDelete(NULL);
 }
 
 static void queue_sound(game_sound_t sound)
@@ -281,6 +295,30 @@ static void queue_sound(game_sound_t sound)
     if (xQueueSend(s_sound_queue, &sound, 0) != pdTRUE) {
         ESP_LOGW(TAG, "sound queue full: event=%d", sound);
     }
+}
+
+static void stop_sound_worker(void)
+{
+    if (s_sound_task) {
+        s_sound_stop_requested = true;
+        s_sound_stop_waiter = xTaskGetCurrentTaskHandle();
+        if (s_sound_queue) {
+            xQueueReset(s_sound_queue);
+            game_sound_t stop = GAME_SOUND_STOP;
+            (void)xQueueSendToFront(s_sound_queue, &stop, 0);
+        }
+        if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000)) == 0) {
+            ESP_LOGE(TAG, "sound task did not stop in time");
+            vTaskDelete(s_sound_task);
+            s_sound_task = NULL;
+        }
+    }
+    s_sound_stop_waiter = NULL;
+    if (s_sound_queue) {
+        vQueueDelete(s_sound_queue);
+        s_sound_queue = NULL;
+    }
+    s_sound_stop_requested = false;
 }
 
 /*
@@ -526,7 +564,8 @@ static void refresh_message(void)
 {
     if (!s_message) return;
     if (s_model.state == EGG_GAME_READY) {
-        lv_label_set_text(s_message, "UP: LEFT\nDOWN: RIGHT\n\nPRESS EITHER KEY");
+        lv_label_set_text(s_message,
+                          "UP: LEFT  DOWN: RIGHT\n\nPRESS UP OR DOWN\nHOLD OK: EXIT");
         lv_obj_remove_flag(s_message, LV_OBJ_FLAG_HIDDEN);
     } else if (s_model.state == EGG_GAME_OVER) {
         lv_label_set_text_fmt(s_message, "GAME OVER\nSCORE %04lu\n\nPRESS UP OR DOWN",
@@ -571,6 +610,7 @@ static void handle_input(game_input_t input)
     uint64_t time_ms = now_ms();
 
     if (!primary_event(input.button, input.event, time_ms)) return;
+    if (input.button == BSP_BTN_OK) return;
 
     if (s_model.state == EGG_GAME_READY || s_model.state == EGG_GAME_OVER ||
         s_model.state == EGG_GAME_WON) {
@@ -586,8 +626,6 @@ static void handle_input(game_input_t input)
         egg_catcher_model_set_side(&s_model, false);
     } else if (input.button == BSP_BTN_DOWN) {
         egg_catcher_model_set_side(&s_model, true);
-    } else if (input.button == BSP_BTN_OK) {
-        egg_catcher_model_toggle_side(&s_model);
     }
     refresh_message();
     refresh_dynamic_objects();
@@ -787,6 +825,8 @@ void egg_catcher_enter(bool buttons_available, bool battery_available,
     s_timer = lv_timer_create(timer_cb, GAME_TIMER_PERIOD_MS, NULL);
 
     if (s_audio_available && !s_sound_queue) {
+        s_sound_stop_requested = false;
+        s_sound_stop_waiter = NULL;
         s_sound_queue = xQueueCreate(4, sizeof(game_sound_t));
         if (!s_sound_queue ||
             xTaskCreate(audio_task, "egg_sound", 3072, NULL, 4, &s_sound_task) != pdPASS) {
@@ -802,8 +842,40 @@ void egg_catcher_enter(bool buttons_available, bool battery_available,
     log_runtime_health("ready");
 }
 
+void egg_catcher_exit(void)
+{
+    if (s_timer) {
+        lv_timer_delete(s_timer);
+        s_timer = NULL;
+    }
+
+    stop_sound_worker();
+
+    if (s_input_queue) {
+        vQueueDelete(s_input_queue);
+        s_input_queue = NULL;
+    }
+    if (s_screen) {
+        lv_obj_delete(s_screen);
+        s_screen = NULL;
+    }
+
+    s_background = NULL;
+    s_score = NULL;
+    s_wolf = NULL;
+    s_message = NULL;
+    s_feedback = NULL;
+    s_break = NULL;
+    s_battery = NULL;
+    for (int i = 0; i < EGG_CATCHER_MAX_MISSES; i++) s_lives[i] = NULL;
+    for (int i = 0; i < EGG_CATCHER_MAX_EGGS; i++) s_egg_objects[i] = NULL;
+    s_audio_available = false;
+    s_battery_available = false;
+}
+
 void egg_catcher_key(bsp_btn_t button, bsp_btn_ev_t event)
 {
+    if (button == BSP_BTN_OK) return;
     if (!s_input_queue) return;
     game_input_t input = { .button = button, .event = event };
     if (xQueueSend(s_input_queue, &input, 0) != pdTRUE) {

@@ -14,6 +14,7 @@
 - Made an egg stay visible in front of the basket opening when contact is made, latch the catch at that moment, then sink behind the basket rim on the next frame.
 - Removed a stray fragment of the reference egg that was baked into the wolf sprite above its hand.
 - Added six gradual speed increases at every 15 catches and a 100-egg victory screen with a short win sound and restart prompt.
+- Restored the lower button's dedicated role: hold `OK` to leave Egg Catcher for its title screen, while only `UP` and `DOWN` control the basket.
 
 - Added the supplied 80-byte CW2017 profile for the specified 520 mAh cell, including content/update-flag checks, verified writes, the required restart sequence, and bounded SOC-readiness polling.
 
