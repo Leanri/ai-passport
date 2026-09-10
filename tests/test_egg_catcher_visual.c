@@ -21,6 +21,10 @@ int main(void)
     assert(visual.phase == EGG_CATCH_VISUAL_SINK);
     assert(visual.sink_pixels == 1);
 
+    visual = egg_catcher_visual_at(EGG_CATCH_VISIBLE_MS + 60U);
+    assert(visual.phase == EGG_CATCH_VISUAL_SINK);
+    assert(visual.sink_pixels == EGG_CATCH_SINK_PX);
+
     visual = egg_catcher_visual_at(EGG_CATCH_VISIBLE_MS +
                                    EGG_CATCH_SINK_MS - 1U);
     assert(visual.phase == EGG_CATCH_VISUAL_SINK);

@@ -24,6 +24,7 @@
 #define BASKET_FRONT_LEFT_X  68
 #define BASKET_FRONT_RIGHT_X 145
 #define BASKET_FRONT_Y       263
+#define BASKET_FRONT_BOTTOM_Y 276
 #define GAME_TIMER_PERIOD_MS 30
 #define GAME_DIAGNOSTIC_PERIOD_MS 10000
 #define GAME_AUDIO_SAMPLE_RATE 16000
@@ -451,6 +452,20 @@ static void draw_egg_frame(lv_obj_t *canvas, uint8_t frame)
     lv_obj_invalidate(canvas);
 }
 
+static void clip_egg_below(lv_obj_t *canvas, int egg_top, int screen_bottom)
+{
+    int first_hidden_row = screen_bottom - egg_top;
+    if (first_hidden_row < 0) first_hidden_row = 0;
+    if (first_hidden_row >= EGG_SPRITE_SIZE) return;
+
+    for (int y = first_hidden_row; y < EGG_SPRITE_SIZE; y++) {
+        for (int x = 0; x < EGG_SPRITE_SIZE; x++) {
+            sprite_px(canvas, EGG_SPRITE_SIZE, EGG_SPRITE_SIZE, x, y, PAL_BG);
+        }
+    }
+    lv_obj_invalidate(canvas);
+}
+
 static void draw_shell_half(bool right)
 {
     static const uint8_t min_x[] = { 7, 5, 4, 3, 2, 2, 2, 3, 4, 6, 8 };
@@ -538,13 +553,13 @@ static void place_egg_behind_fox(int index)
 static void place_caught_egg(int index, egg_catch_visual_phase_t phase)
 {
     if (phase == EGG_CATCH_VISUAL_FRONT) {
-        /* Contact: the complete egg is visible over the basket opening. */
-        lv_obj_move_foreground(s_basket_front);
+        /* Contact: the full fox remains below the complete visible egg. */
         lv_obj_move_foreground(s_egg_objects[index]);
     } else {
         /* Sinking: the compact hand/front-wall crop masks the lower egg. */
         lv_obj_move_foreground(s_egg_objects[index]);
         lv_obj_move_foreground(s_basket_front);
+        lv_obj_remove_flag(s_basket_front, LV_OBJ_FLAG_HIDDEN);
     }
 }
 
@@ -590,6 +605,9 @@ static void refresh_dynamic_objects(uint64_t time_ms)
     if (!s_fox_drawn || s_rendered_basket_right != s_model.basket_right) {
         draw_fox(s_model.basket_right);
     }
+    /* The full fox already contains the basket. Show its duplicate front crop
+     * only during the 90 ms sinking phase to avoid darkening alpha edges. */
+    lv_obj_add_flag(s_basket_front, LV_OBJ_FLAG_HIDDEN);
 
     for (int i = 0; i < EGG_CATCHER_MAX_EGGS; i++) {
         const egg_catcher_egg_t *egg = &s_model.eggs[i];
@@ -621,8 +639,13 @@ static void refresh_dynamic_objects(uint64_t time_ms)
             uint8_t frame = (uint8_t)(EGG_CATCHER_LANE_STEPS + contact_step);
 
             draw_egg_frame(object, frame);
-            lv_obj_set_pos(object, x - EGG_SPRITE_SIZE / 2,
-                           y - EGG_SPRITE_SIZE / 2);
+            int egg_top = y - EGG_SPRITE_SIZE / 2;
+            if (visual.phase == EGG_CATCH_VISUAL_SINK) {
+                /* The front crop ends at the basket base. Clear any remaining
+                 * egg pixels below it so no tip can appear under the basket. */
+                clip_egg_below(object, egg_top, BASKET_FRONT_BOTTOM_Y);
+            }
+            lv_obj_set_pos(object, x - EGG_SPRITE_SIZE / 2, egg_top);
             place_caught_egg(i, visual.phase);
             lv_obj_remove_flag(object, LV_OBJ_FLAG_HIDDEN);
             continue;
