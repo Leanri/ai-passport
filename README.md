@@ -4,12 +4,12 @@
 
 # Egg Catcher for FoloToy AI Passport
 
-A compact egg-catching game inspired by classic handheld LCD games. It runs directly after boot and uses tiny one-bit pixel sprites, so no large image assets are stored in Flash or RAM.
+A compact egg-catching game inspired by classic handheld LCD games. It runs directly after boot and uses display-sized artwork; the high-resolution source image is not loaded into device memory.
 
 ## Controls
 
-- `UP`: turn the wolf and basket to the left chicken.
-- `DOWN`: turn the wolf and basket to the right chicken.
+- `UP`: turn the fox and basket to the left chicken.
+- `DOWN`: turn the fox and basket to the right chicken.
 - Press either button on the start or game-over screen to play.
 - Hold `OK`: leave the game and return to the title screen.
 - Press `OK` on the title screen to play again.

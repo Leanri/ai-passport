@@ -8,6 +8,6 @@ idf_component_register(
     INCLUDE_DIRS "."
     REQUIRES bsp esp_timer
     EMBED_FILES "assets/egg_game_background.rgb565"
-                "assets/egg_game_wolf_left.argb8888"
-                "assets/egg_game_wolf_right.argb8888"
+                "assets/egg_game_fox_left.argb8888"
+                "assets/egg_game_fox_right.argb8888"
 )

@@ -24,6 +24,12 @@
 - 许可允许时保留可编辑源文件，并记录来源与许可。
 - 图片中不得包含设备二维码秘密、凭证或个人数据。
 
+### 接鸡蛋游戏狐狸
+
+- 源文件：`images/egg-catcher-fox-source.png`，1254 × 1254 RGBA 图片，由 fork 所有者提供并仅授权在此个人 fork 中使用；不声明更广泛的再分发许可。
+- 集成方式：`tools/prepare_egg_fox.py` 按透明区域裁剪，以最近邻采样缩放进 110 × 110 画布，镜像生成左侧动作，并将 LVGL ARGB8888/BGRA 字节写入 `main/assets/egg_game_fox_{left,right}.argb8888`。
+- 重新生成：安装 Pillow 后，在仓库根目录运行 `python tools/prepare_egg_fox.py`。
+
 ## 音乐与音效（music）
 
 可复用的音乐与音效源码放在 `music/`。

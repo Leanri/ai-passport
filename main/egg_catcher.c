@@ -14,10 +14,10 @@
 
 #define GAME_SCREEN_W 240
 #define GAME_SCREEN_H 320
-#define WOLF_COLOR_W  90
-#define WOLF_COLOR_H  90
-#define WOLF_X        75
-#define WOLF_Y        226
+#define FOX_COLOR_W   110
+#define FOX_COLOR_H   110
+#define FOX_X         65
+#define FOX_Y         210
 #define GAME_TIMER_PERIOD_MS 30
 #define GAME_DIAGNOSTIC_PERIOD_MS 10000
 #define GAME_AUDIO_SAMPLE_RATE 16000
@@ -78,10 +78,10 @@ static const int8_t FALL_Y[2][EGG_CATCHER_UPPER_FALL_STEPS] = {
 
 extern const uint8_t egg_game_background_start[]
     asm("_binary_egg_game_background_rgb565_start");
-extern const uint8_t egg_game_wolf_left_start[]
-    asm("_binary_egg_game_wolf_left_argb8888_start");
-extern const uint8_t egg_game_wolf_right_start[]
-    asm("_binary_egg_game_wolf_right_argb8888_start");
+extern const uint8_t egg_game_fox_left_start[]
+    asm("_binary_egg_game_fox_left_argb8888_start");
+extern const uint8_t egg_game_fox_right_start[]
+    asm("_binary_egg_game_fox_right_argb8888_start");
 
 static const lv_image_dsc_t BACKGROUND_IMAGE = {
     .header = {
@@ -95,21 +95,21 @@ static const lv_image_dsc_t BACKGROUND_IMAGE = {
     .data = egg_game_background_start,
 };
 
-#define WOLF_IMAGE(source) \
+#define FOX_IMAGE(source) \
     { \
         .header = { \
             .magic = LV_IMAGE_HEADER_MAGIC, \
             .cf = LV_COLOR_FORMAT_ARGB8888, \
-            .w = WOLF_COLOR_W, \
-            .h = WOLF_COLOR_H, \
-            .stride = WOLF_COLOR_W * 4, \
+            .w = FOX_COLOR_W, \
+            .h = FOX_COLOR_H, \
+            .stride = FOX_COLOR_W * 4, \
         }, \
-        .data_size = WOLF_COLOR_W * WOLF_COLOR_H * 4, \
+        .data_size = FOX_COLOR_W * FOX_COLOR_H * 4, \
         .data = source, \
     }
 
-static const lv_image_dsc_t WOLF_LEFT_IMAGE = WOLF_IMAGE(egg_game_wolf_left_start);
-static const lv_image_dsc_t WOLF_RIGHT_IMAGE = WOLF_IMAGE(egg_game_wolf_right_start);
+static const lv_image_dsc_t FOX_LEFT_IMAGE = FOX_IMAGE(egg_game_fox_left_start);
+static const lv_image_dsc_t FOX_RIGHT_IMAGE = FOX_IMAGE(egg_game_fox_right_start);
 
 static const uint16_t EGG_OUTER_MASKS[4][EGG_SPRITE_SIZE] = {
     { 0x0080, 0x01C0, 0x07F0, 0x0FF8, 0x0FF8, 0x1FFC, 0x1FFC, 0x1FFC,
@@ -146,7 +146,7 @@ static lv_obj_t *s_background;
 static lv_obj_t *s_score;
 static lv_obj_t *s_lives[EGG_CATCHER_MAX_MISSES];
 static lv_obj_t *s_egg_objects[EGG_CATCHER_MAX_EGGS];
-static lv_obj_t *s_wolf;
+static lv_obj_t *s_fox;
 static lv_obj_t *s_message;
 static lv_obj_t *s_feedback;
 static lv_obj_t *s_break;
@@ -168,7 +168,7 @@ static bool s_press_seen[3];
 static bool s_egg_foreground[EGG_CATCHER_MAX_EGGS];
 static bool s_audio_available;
 static bool s_battery_available;
-static bool s_wolf_drawn;
+static bool s_fox_drawn;
 static bool s_rendered_basket_right;
 static volatile bool s_sound_stop_requested;
 
@@ -482,13 +482,13 @@ static void show_broken_egg(egg_catcher_lane_t lane, bool upper_track,
     s_break_until_ms = time_ms + 900U;
 }
 
-static void draw_wolf(bool basket_right)
+static void draw_fox(bool basket_right)
 {
-    lv_image_set_src(s_wolf, basket_right ? &WOLF_RIGHT_IMAGE : &WOLF_LEFT_IMAGE);
-    lv_obj_set_pos(s_wolf, WOLF_X, WOLF_Y);
-    lv_obj_invalidate(s_wolf);
+    lv_image_set_src(s_fox, basket_right ? &FOX_RIGHT_IMAGE : &FOX_LEFT_IMAGE);
+    lv_obj_set_pos(s_fox, FOX_X, FOX_Y);
+    lv_obj_invalidate(s_fox);
     s_rendered_basket_right = basket_right;
-    s_wolf_drawn = true;
+    s_fox_drawn = true;
 }
 
 static void set_egg_foreground(int index, bool foreground)
@@ -518,8 +518,8 @@ static void refresh_dynamic_objects(void)
         s_rendered_misses = s_model.misses;
     }
 
-    if (!s_wolf_drawn || s_rendered_basket_right != s_model.basket_right) {
-        draw_wolf(s_model.basket_right);
+    if (!s_fox_drawn || s_rendered_basket_right != s_model.basket_right) {
+        draw_fox(s_model.basket_right);
     }
 
     for (int i = 0; i < EGG_CATCHER_MAX_EGGS; i++) {
@@ -706,7 +706,7 @@ void egg_catcher_enter(bool buttons_available, bool battery_available,
     for (int i = 0; i < EGG_CATCHER_MAX_EGGS; i++) {
         s_egg_foreground[i] = false;
     }
-    s_wolf_drawn = false;
+    s_fox_drawn = false;
     s_rendered_score = UINT32_MAX;
     s_rendered_misses = UINT8_MAX;
 
@@ -764,10 +764,10 @@ void egg_catcher_enter(bool buttons_available, bool battery_available,
         lv_obj_add_flag(s_egg_objects[i], LV_OBJ_FLAG_HIDDEN);
     }
 
-    /* Keep eggs behind the wolf so a caught egg enters the basket instead of
+    /* Keep eggs behind the fox so a caught egg enters the basket instead of
      * being painted over its rim. */
-    s_wolf = lv_image_create(s_screen);
-    lv_obj_remove_flag(s_wolf, LV_OBJ_FLAG_SCROLLABLE);
+    s_fox = lv_image_create(s_screen);
+    lv_obj_remove_flag(s_fox, LV_OBJ_FLAG_SCROLLABLE);
 
     LV_DRAW_BUF_INIT_STATIC(break_buf);
     s_break = lv_canvas_create(s_screen);
@@ -862,7 +862,7 @@ void egg_catcher_exit(void)
 
     s_background = NULL;
     s_score = NULL;
-    s_wolf = NULL;
+    s_fox = NULL;
     s_message = NULL;
     s_feedback = NULL;
     s_break = NULL;

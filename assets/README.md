@@ -26,6 +26,12 @@ Store reusable source images and generated display assets in `images/`.
 - Preserve editable sources where licensing permits, and record the source and license.
 - Never commit device QR secrets, credentials, or personal data in images.
 
+### Egg Catcher fox
+
+- Source: `images/egg-catcher-fox-source.png`, a 1254 × 1254 RGBA image supplied by the fork owner for use in this personal fork; no broader redistribution license is claimed.
+- Integration: `tools/prepare_egg_fox.py` crops the alpha bounds, fits the artwork inside a 110 × 110 canvas with nearest-neighbor sampling, mirrors the left pose, and writes LVGL ARGB8888/BGRA bytes to `main/assets/egg_game_fox_{left,right}.argb8888`.
+- Regeneration: install Pillow and run `python tools/prepare_egg_fox.py` from the repository root.
+
 ## Music and sound effects
 
 Store reusable music and sound-effect sources in `music/`.
