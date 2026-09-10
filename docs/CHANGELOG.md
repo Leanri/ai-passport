@@ -7,7 +7,7 @@
 ## Unreleased
 
 - Added the user-supplied full-screen victory artwork shown immediately after the fox catches the hundredth egg.
-- Removed the interim FoloToy demo menu so the standalone Egg Catcher game begins immediately at power-on.
+- Removed the interim FoloToy demo menu so the standalone Egg Catcher screen appears at power-on; egg movement begins only after an `UP` or `DOWN` press.
 - Added transparent mirrored hand/basket-front layers and a fixed 180 ms catch animation: the egg remains fully visible for 90 ms, sinks no more than four pixels behind the basket front for 90 ms, and then disappears without any below-basket frame.
 - Made each 15-egg difficulty step visibly stronger while keeping one shared movement speed for both tracks, and added a `SPEED UP!` cue at every threshold.
 
