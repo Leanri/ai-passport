@@ -3,6 +3,7 @@
 #include "bsp_audio.h"
 #include "bsp_battery.h"
 #include "egg_catcher_model.h"
+#include "egg_catcher_visual.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -18,6 +19,11 @@
 #define FOX_COLOR_H   110
 #define FOX_X         65
 #define FOX_Y         210
+#define BASKET_FRONT_W 27
+#define BASKET_FRONT_H 16
+#define BASKET_FRONT_LEFT_X  68
+#define BASKET_FRONT_RIGHT_X 145
+#define BASKET_FRONT_Y       263
 #define GAME_TIMER_PERIOD_MS 30
 #define GAME_DIAGNOSTIC_PERIOD_MS 10000
 #define GAME_AUDIO_SAMPLE_RATE 16000
@@ -82,6 +88,10 @@ extern const uint8_t egg_game_fox_left_start[]
     asm("_binary_egg_game_fox_left_argb8888_start");
 extern const uint8_t egg_game_fox_right_start[]
     asm("_binary_egg_game_fox_right_argb8888_start");
+extern const uint8_t egg_game_basket_front_left_start[]
+    asm("_binary_egg_game_basket_front_left_argb8888_start");
+extern const uint8_t egg_game_basket_front_right_start[]
+    asm("_binary_egg_game_basket_front_right_argb8888_start");
 
 static const lv_image_dsc_t BACKGROUND_IMAGE = {
     .header = {
@@ -110,6 +120,24 @@ static const lv_image_dsc_t BACKGROUND_IMAGE = {
 
 static const lv_image_dsc_t FOX_LEFT_IMAGE = FOX_IMAGE(egg_game_fox_left_start);
 static const lv_image_dsc_t FOX_RIGHT_IMAGE = FOX_IMAGE(egg_game_fox_right_start);
+
+#define BASKET_FRONT_IMAGE(source) \
+    { \
+        .header = { \
+            .magic = LV_IMAGE_HEADER_MAGIC, \
+            .cf = LV_COLOR_FORMAT_ARGB8888, \
+            .w = BASKET_FRONT_W, \
+            .h = BASKET_FRONT_H, \
+            .stride = BASKET_FRONT_W * 4, \
+        }, \
+        .data_size = BASKET_FRONT_W * BASKET_FRONT_H * 4, \
+        .data = source, \
+    }
+
+static const lv_image_dsc_t BASKET_FRONT_LEFT_IMAGE =
+    BASKET_FRONT_IMAGE(egg_game_basket_front_left_start);
+static const lv_image_dsc_t BASKET_FRONT_RIGHT_IMAGE =
+    BASKET_FRONT_IMAGE(egg_game_basket_front_right_start);
 
 static const uint16_t EGG_OUTER_MASKS[4][EGG_SPRITE_SIZE] = {
     { 0x0080, 0x01C0, 0x07F0, 0x0FF8, 0x0FF8, 0x1FFC, 0x1FFC, 0x1FFC,
@@ -147,6 +175,7 @@ static lv_obj_t *s_score;
 static lv_obj_t *s_lives[EGG_CATCHER_MAX_MISSES];
 static lv_obj_t *s_egg_objects[EGG_CATCHER_MAX_EGGS];
 static lv_obj_t *s_fox;
+static lv_obj_t *s_basket_front;
 static lv_obj_t *s_message;
 static lv_obj_t *s_feedback;
 static lv_obj_t *s_break;
@@ -165,7 +194,10 @@ static uint64_t s_last_press_ms[3];
 static uint32_t s_rendered_score;
 static uint8_t s_rendered_misses;
 static bool s_press_seen[3];
-static bool s_egg_foreground[EGG_CATCHER_MAX_EGGS];
+/* 0 means idle, UINT64_MAX means the current caught egg already finished its
+ * visual. The sentinel prevents a consumed model egg from restarting the
+ * animation before its slot is reused. */
+static uint64_t s_caught_since_ms[EGG_CATCHER_MAX_EGGS];
 static bool s_audio_available;
 static bool s_battery_available;
 static bool s_fox_drawn;
@@ -486,25 +518,62 @@ static void draw_fox(bool basket_right)
 {
     lv_image_set_src(s_fox, basket_right ? &FOX_RIGHT_IMAGE : &FOX_LEFT_IMAGE);
     lv_obj_set_pos(s_fox, FOX_X, FOX_Y);
+    lv_image_set_src(s_basket_front, basket_right ? &BASKET_FRONT_RIGHT_IMAGE
+                                                  : &BASKET_FRONT_LEFT_IMAGE);
+    lv_obj_set_pos(s_basket_front,
+                   basket_right ? BASKET_FRONT_RIGHT_X : BASKET_FRONT_LEFT_X,
+                   BASKET_FRONT_Y);
     lv_obj_invalidate(s_fox);
+    lv_obj_invalidate(s_basket_front);
     s_rendered_basket_right = basket_right;
     s_fox_drawn = true;
 }
 
-static void set_egg_foreground(int index, bool foreground)
+static void place_egg_behind_fox(int index)
 {
-    if (s_egg_foreground[index] == foreground) return;
-
-    if (foreground) {
-        lv_obj_move_foreground(s_egg_objects[index]);
-    } else {
-        lv_obj_move_background(s_egg_objects[index]);
-        lv_obj_move_background(s_background);
-    }
-    s_egg_foreground[index] = foreground;
+    lv_obj_move_background(s_egg_objects[index]);
+    lv_obj_move_background(s_background);
 }
 
-static void refresh_dynamic_objects(void)
+static void place_caught_egg(int index, egg_catch_visual_phase_t phase)
+{
+    if (phase == EGG_CATCH_VISUAL_FRONT) {
+        /* Contact: the complete egg is visible over the basket opening. */
+        lv_obj_move_foreground(s_basket_front);
+        lv_obj_move_foreground(s_egg_objects[index]);
+    } else {
+        /* Sinking: the compact hand/front-wall crop masks the lower egg. */
+        lv_obj_move_foreground(s_egg_objects[index]);
+        lv_obj_move_foreground(s_basket_front);
+    }
+}
+
+static void reset_catch_animations(void)
+{
+    for (int i = 0; i < EGG_CATCHER_MAX_EGGS; i++) {
+        s_caught_since_ms[i] = 0;
+    }
+}
+
+static void record_new_catches(uint64_t time_ms)
+{
+    for (int i = 0; i < EGG_CATCHER_MAX_EGGS; i++) {
+        if (s_model.eggs[i].caught && s_caught_since_ms[i] == 0) {
+            s_caught_since_ms[i] = time_ms ? time_ms : 1U;
+        }
+    }
+}
+
+static bool catch_animation_active(void)
+{
+    for (int i = 0; i < EGG_CATCHER_MAX_EGGS; i++) {
+        if (s_caught_since_ms[i] != 0 &&
+            s_caught_since_ms[i] != UINT64_MAX) return true;
+    }
+    return false;
+}
+
+static void refresh_dynamic_objects(uint64_t time_ms)
 {
     if (s_rendered_score != s_model.score) {
         lv_label_set_text_fmt(s_score, "%04lu", (unsigned long)(s_model.score % 10000U));
@@ -525,8 +594,42 @@ static void refresh_dynamic_objects(void)
     for (int i = 0; i < EGG_CATCHER_MAX_EGGS; i++) {
         const egg_catcher_egg_t *egg = &s_model.eggs[i];
         lv_obj_t *object = s_egg_objects[i];
-        if (!egg->active) {
-            set_egg_foreground(i, false);
+
+        if (!egg->caught && s_caught_since_ms[i] == UINT64_MAX) {
+            s_caught_since_ms[i] = 0;
+        }
+
+        if (s_caught_since_ms[i] != 0 &&
+            s_caught_since_ms[i] != UINT64_MAX) {
+            uint64_t elapsed = time_ms - s_caught_since_ms[i];
+            egg_catch_visual_t visual = egg_catcher_visual_at(
+                elapsed > UINT32_MAX ? UINT32_MAX : (uint32_t)elapsed);
+            if (visual.phase == EGG_CATCH_VISUAL_HIDDEN) {
+                s_caught_since_ms[i] = UINT64_MAX;
+                place_egg_behind_fox(i);
+                lv_obj_add_flag(object, LV_OBJ_FLAG_HIDDEN);
+                continue;
+            }
+
+            int track = egg->upper_track ? 1 : 0;
+            uint8_t contact_step = egg_catcher_model_fall_steps(egg) - 2U;
+            int direction = egg->lane == EGG_LANE_LEFT ? 1 : -1;
+            int x = TRACK_END[egg->lane][track].x +
+                    direction * FALL_X[track][contact_step];
+            int y = TRACK_END[egg->lane][track].y +
+                    FALL_Y[track][contact_step] + visual.sink_pixels;
+            uint8_t frame = (uint8_t)(EGG_CATCHER_LANE_STEPS + contact_step);
+
+            draw_egg_frame(object, frame);
+            lv_obj_set_pos(object, x - EGG_SPRITE_SIZE / 2,
+                           y - EGG_SPRITE_SIZE / 2);
+            place_caught_egg(i, visual.phase);
+            lv_obj_remove_flag(object, LV_OBJ_FLAG_HIDDEN);
+            continue;
+        }
+
+        if (!egg->active || egg->caught) {
+            place_egg_behind_fox(i);
             lv_obj_add_flag(object, LV_OBJ_FLAG_HIDDEN);
             continue;
         }
@@ -538,14 +641,14 @@ static void refresh_dynamic_objects(void)
             uint8_t fall_steps = egg_catcher_model_fall_steps(egg);
             uint8_t fall_step = egg->step < fall_steps
                                     ? egg->step : fall_steps - 1;
-            set_egg_foreground(i, fall_step == fall_steps - 2U);
+            place_egg_behind_fox(i);
             int direction = egg->lane == EGG_LANE_LEFT ? 1 : -1;
             x = TRACK_END[egg->lane][track].x +
                 direction * FALL_X[track][fall_step];
             y = TRACK_END[egg->lane][track].y + FALL_Y[track][fall_step];
             frame = (uint8_t)(EGG_CATCHER_LANE_STEPS + fall_step);
         } else {
-            set_egg_foreground(i, false);
+            place_egg_behind_fox(i);
             game_point_t start = TRACK_START[egg->lane][track];
             game_point_t end = TRACK_END[egg->lane][track];
             int divisor = EGG_CATCHER_LANE_STEPS - 1;
@@ -615,6 +718,7 @@ static void handle_input(game_input_t input)
     if (s_model.state == EGG_GAME_READY || s_model.state == EGG_GAME_OVER ||
         s_model.state == EGG_GAME_WON) {
         egg_catcher_model_start(&s_model);
+        reset_catch_animations();
         queue_sound(GAME_SOUND_START);
         lv_obj_add_flag(s_break, LV_OBJ_FLAG_HIDDEN);
         s_break_until_ms = 0;
@@ -628,7 +732,7 @@ static void handle_input(game_input_t input)
         egg_catcher_model_set_side(&s_model, true);
     }
     refresh_message();
-    refresh_dynamic_objects();
+    refresh_dynamic_objects(time_ms);
 }
 
 static void show_feedback(const char *text, uint32_t color, uint64_t time_ms)
@@ -653,7 +757,10 @@ static void timer_cb(lv_timer_t *timer)
     s_last_tick_ms = time_ms;
 
     egg_catcher_event_t event = egg_catcher_model_advance(&s_model, (uint32_t)delta);
-    if (event != EGG_EVENT_NONE) refresh_dynamic_objects();
+    if (event & EGG_EVENT_CAUGHT) record_new_catches(time_ms);
+    if (event != EGG_EVENT_NONE || catch_animation_active()) {
+        refresh_dynamic_objects(time_ms);
+    }
     if (event & EGG_EVENT_CAUGHT) {
         show_feedback("CATCH!", UI_GRASS_DARK, time_ms);
         queue_sound(GAME_SOUND_CATCH);
@@ -703,9 +810,7 @@ void egg_catcher_enter(bool buttons_available, bool battery_available,
         s_last_press_ms[i] = 0;
         s_press_seen[i] = false;
     }
-    for (int i = 0; i < EGG_CATCHER_MAX_EGGS; i++) {
-        s_egg_foreground[i] = false;
-    }
+    reset_catch_animations();
     s_fox_drawn = false;
     s_rendered_score = UINT32_MAX;
     s_rendered_misses = UINT8_MAX;
@@ -769,6 +874,11 @@ void egg_catcher_enter(bool buttons_available, bool battery_available,
     s_fox = lv_image_create(s_screen);
     lv_obj_remove_flag(s_fox, LV_OBJ_FLAG_SCROLLABLE);
 
+    /* This small transparent duplicate provides only the hand and front wall
+     * that must cover an egg while it sinks into the basket. */
+    s_basket_front = lv_image_create(s_screen);
+    lv_obj_remove_flag(s_basket_front, LV_OBJ_FLAG_SCROLLABLE);
+
     LV_DRAW_BUF_INIT_STATIC(break_buf);
     s_break = lv_canvas_create(s_screen);
     lv_canvas_set_draw_buf(s_break, &break_buf);
@@ -808,7 +918,7 @@ void egg_catcher_enter(bool buttons_available, bool battery_available,
     lv_obj_set_style_border_width(s_message, 3, 0);
     lv_obj_set_style_pad_top(s_message, 10, 0);
 
-    refresh_dynamic_objects();
+    refresh_dynamic_objects(now_ms());
     if (!buttons_available) {
         lv_label_set_text(s_message, "BUTTONS NOT FOUND\n\nCHECK THE BOARD");
     } else {
@@ -863,12 +973,14 @@ void egg_catcher_exit(void)
     s_background = NULL;
     s_score = NULL;
     s_fox = NULL;
+    s_basket_front = NULL;
     s_message = NULL;
     s_feedback = NULL;
     s_break = NULL;
     s_battery = NULL;
     for (int i = 0; i < EGG_CATCHER_MAX_MISSES; i++) s_lives[i] = NULL;
     for (int i = 0; i < EGG_CATCHER_MAX_EGGS; i++) s_egg_objects[i] = NULL;
+    reset_catch_animations();
     s_audio_available = false;
     s_battery_available = false;
 }

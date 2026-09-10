@@ -6,6 +6,9 @@
 
 ## Unreleased
 
+- Restored the standard FoloToy AI Passport main menu and added Egg Catcher as a normal menu item; holding `OK` in the game now returns to the system menu instead of a game-only title screen.
+- Added transparent mirrored hand/basket-front layers and a fixed 180 ms catch animation: the egg remains fully visible for 90 ms, sinks no more than four pixels behind the basket front for 90 ms, and then disappears without any below-basket frame.
+
 - Added the standalone Egg Catcher game: two-lane egg movement, direct two-button left/right controls, score, misses, restart flow, increasing difficulty, battery status, two distinct reference-derived wolf poses, detailed hens, chutes, houses and shrubs, and host-tested game logic.
 - Restored the Egg Catcher background's original thin chutes without the duplicate overpaint, completed the wolf's missing rear foot in both poses, reduced repeated LVGL label updates, and added periodic memory/stack diagnostics plus a one-hour model stress test for restart investigation.
 - Changed basket contact to latch a catch immediately, placed falling eggs behind the basket rim, and added distinct start, catch, shell-break, and game-over sounds through a non-blocking audio worker.

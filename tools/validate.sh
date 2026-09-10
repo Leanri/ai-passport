@@ -32,6 +32,10 @@ run_static_checks() {
         tests/test_egg_catcher_model.c main/egg_catcher_model.c \
         -o "${test_dir}/test_egg_catcher_model"
     "${test_dir}/test_egg_catcher_model"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Imain \
+        tests/test_egg_catcher_visual.c main/egg_catcher_visual.c \
+        -o "${test_dir}/test_egg_catcher_visual"
+    "${test_dir}/test_egg_catcher_visual"
     python3 tests/test_verify_firmware.py
     rm -rf "${test_dir}"
     echo "Host tests: PASS"
