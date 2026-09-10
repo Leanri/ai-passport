@@ -49,6 +49,7 @@ static bool spawn_egg(egg_catcher_model_t *model)
         if (lane_busy[lane]) continue;
         model->eggs[free_slot].active = true;
         model->eggs[free_slot].falling = false;
+        model->eggs[free_slot].caught = false;
         model->eggs[free_slot].upper_track = (random_next(model) & 1U) != 0;
         model->eggs[free_slot].lane = (egg_catcher_lane_t)lane;
         model->eggs[free_slot].step = 0;
@@ -95,15 +96,23 @@ static egg_catcher_event_t move_eggs(egg_catcher_model_t *model)
         if (!egg->active) continue;
 
         if (egg->falling) {
+            if (egg->caught) {
+                egg->active = false;
+                event |= EGG_EVENT_MOVED;
+                continue;
+            }
+
             egg->step++;
             event |= EGG_EVENT_MOVED;
-            if (egg->step < EGG_CATCHER_FALL_STEPS) continue;
+            if (egg->step < EGG_CATCHER_FALL_STEPS - 1) continue;
 
-            egg->active = false;
             if (egg->lane == basket) {
+                /* Latch the catch as soon as the egg reaches the basket. */
+                egg->caught = true;
                 model->score++;
                 event |= EGG_EVENT_CAUGHT;
             } else {
+                egg->active = false;
                 model->last_missed_lane = egg->lane;
                 model->last_missed_upper_track = egg->upper_track;
                 model->misses++;

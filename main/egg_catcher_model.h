@@ -32,6 +32,7 @@ typedef enum {
 typedef struct {
     bool active;
     bool falling;
+    bool caught;
     bool upper_track;
     egg_catcher_lane_t lane;
     uint8_t step;

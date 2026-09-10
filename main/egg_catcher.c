@@ -1,5 +1,6 @@
 #include "egg_catcher.h"
 
+#include "bsp_audio.h"
 #include "bsp_battery.h"
 #include "egg_catcher_model.h"
 #include "esp_heap_caps.h"
@@ -19,6 +20,8 @@
 #define WOLF_Y        226
 #define GAME_TIMER_PERIOD_MS 30
 #define GAME_DIAGNOSTIC_PERIOD_MS 10000
+#define GAME_AUDIO_SAMPLE_RATE 16000
+#define GAME_AUDIO_CHUNK_SAMPLES 128
 #define EGG_SPRITE_SIZE 16
 #define BREAK_SPRITE_W 28
 #define BREAK_SPRITE_H 20
@@ -44,6 +47,13 @@ typedef struct {
     int16_t x;
     int16_t y;
 } game_point_t;
+
+typedef enum {
+    GAME_SOUND_START = 1,
+    GAME_SOUND_CATCH,
+    GAME_SOUND_BREAK,
+    GAME_SOUND_OVER,
+} game_sound_t;
 
 static const char *TAG = "egg_game";
 
@@ -138,6 +148,8 @@ static lv_obj_t *s_break;
 static lv_obj_t *s_battery;
 static lv_timer_t *s_timer;
 static QueueHandle_t s_input_queue;
+static QueueHandle_t s_sound_queue;
+static TaskHandle_t s_sound_task;
 static uint64_t s_last_tick_ms;
 static uint64_t s_feedback_until_ms;
 static uint64_t s_break_until_ms;
@@ -147,6 +159,7 @@ static uint64_t s_last_press_ms[3];
 static uint32_t s_rendered_score;
 static uint8_t s_rendered_misses;
 static bool s_press_seen[3];
+static bool s_audio_available;
 static bool s_battery_available;
 static bool s_wolf_drawn;
 static bool s_rendered_basket_right;
@@ -154,6 +167,111 @@ static bool s_rendered_basket_right;
 static uint64_t now_ms(void)
 {
     return (uint64_t)esp_timer_get_time() / 1000ULL;
+}
+
+static bool write_pcm(const int16_t *samples, size_t count)
+{
+    if (bsp_audio_write(samples, count * sizeof(samples[0])) == ESP_OK) return true;
+    ESP_LOGW(TAG, "sound write failed");
+    return false;
+}
+
+/* Generate a compact triangle-wave sweep without a heap allocation. */
+static bool play_tone_sweep(uint16_t start_hz, uint16_t end_hz,
+                            uint16_t duration_ms, int16_t peak)
+{
+    int16_t samples[GAME_AUDIO_CHUNK_SAMPLES];
+    uint32_t phase = 0;
+    uint32_t total = GAME_AUDIO_SAMPLE_RATE * duration_ms / 1000U;
+
+    for (uint32_t offset = 0; offset < total;) {
+        size_t count = total - offset;
+        if (count > GAME_AUDIO_CHUNK_SAMPLES) count = GAME_AUDIO_CHUNK_SAMPLES;
+        for (size_t i = 0; i < count; i++) {
+            uint32_t position = offset + i;
+            uint32_t hz = start_hz +
+                (uint32_t)((int32_t)(end_hz - start_hz) * (int32_t)position /
+                           (int32_t)total);
+            phase += hz;
+            if (phase >= GAME_AUDIO_SAMPLE_RATE) phase -= GAME_AUDIO_SAMPLE_RATE;
+            int32_t triangle = phase < GAME_AUDIO_SAMPLE_RATE / 2
+                                   ? (int32_t)phase * 4 - GAME_AUDIO_SAMPLE_RATE
+                                   : (GAME_AUDIO_SAMPLE_RATE - (int32_t)phase) * 4 -
+                                         GAME_AUDIO_SAMPLE_RATE;
+            int32_t envelope = peak * (int32_t)(total - position) / (int32_t)total;
+            samples[i] = (int16_t)(triangle * envelope / GAME_AUDIO_SAMPLE_RATE);
+        }
+        if (!write_pcm(samples, count)) return false;
+        offset += count;
+    }
+    return true;
+}
+
+/* A short decaying noise burst reads as a shell crack on the small speaker. */
+static bool play_crack(void)
+{
+    int16_t samples[GAME_AUDIO_CHUNK_SAMPLES];
+    uint32_t noise = 0x91E10DA5U;
+    uint32_t total = GAME_AUDIO_SAMPLE_RATE * 90U / 1000U;
+
+    for (uint32_t offset = 0; offset < total;) {
+        size_t count = total - offset;
+        if (count > GAME_AUDIO_CHUNK_SAMPLES) count = GAME_AUDIO_CHUNK_SAMPLES;
+        for (size_t i = 0; i < count; i++) {
+            uint32_t position = offset + i;
+            noise ^= noise << 13;
+            noise ^= noise >> 17;
+            noise ^= noise << 5;
+            int32_t centered = (int32_t)(noise & 0xFFFFU) - 32768;
+            int32_t envelope = 9000 * (int32_t)(total - position) / (int32_t)total;
+            samples[i] = (int16_t)(centered * envelope / 32768);
+        }
+        if (!write_pcm(samples, count)) return false;
+        offset += count;
+    }
+    return play_tone_sweep(260, 110, 90, 6000);
+}
+
+static void audio_task(void *arg)
+{
+    (void)arg;
+    if (bsp_audio_set_format(GAME_AUDIO_SAMPLE_RATE, 16, 1) != ESP_OK) {
+        ESP_LOGE(TAG, "game sound format setup failed");
+        s_audio_available = false;
+        s_sound_task = NULL;
+        vTaskDelete(NULL);
+        return;
+    }
+    bsp_audio_set_volume(72);
+
+    for (;;) {
+        game_sound_t sound;
+        if (xQueueReceive(s_sound_queue, &sound, portMAX_DELAY) != pdTRUE) continue;
+        switch (sound) {
+            case GAME_SOUND_START:
+                (void)play_tone_sweep(520, 820, 80, 5000);
+                break;
+            case GAME_SOUND_CATCH:
+                (void)play_tone_sweep(760, 1450, 130, 7000);
+                break;
+            case GAME_SOUND_BREAK:
+                (void)play_crack();
+                break;
+            case GAME_SOUND_OVER:
+                (void)play_tone_sweep(520, 220, 280, 6500);
+                break;
+            default:
+                break;
+        }
+    }
+}
+
+static void queue_sound(game_sound_t sound)
+{
+    if (!s_audio_available || !s_sound_queue) return;
+    if (xQueueSend(s_sound_queue, &sound, 0) != pdTRUE) {
+        ESP_LOGW(TAG, "sound queue full: event=%d", sound);
+    }
 }
 
 /*
@@ -424,6 +542,7 @@ static void handle_input(game_input_t input)
 
     if (s_model.state == EGG_GAME_READY || s_model.state == EGG_GAME_OVER) {
         egg_catcher_model_start(&s_model);
+        queue_sound(GAME_SOUND_START);
         lv_obj_add_flag(s_break, LV_OBJ_FLAG_HIDDEN);
         s_break_until_ms = 0;
         s_last_tick_ms = time_ms;
@@ -464,13 +583,20 @@ static void timer_cb(lv_timer_t *timer)
 
     egg_catcher_event_t event = egg_catcher_model_advance(&s_model, (uint32_t)delta);
     if (event != EGG_EVENT_NONE) refresh_dynamic_objects();
-    if (event & EGG_EVENT_CAUGHT) show_feedback("CATCH!", UI_GRASS_DARK, time_ms);
+    if (event & EGG_EVENT_CAUGHT) {
+        show_feedback("CATCH!", UI_GRASS_DARK, time_ms);
+        queue_sound(GAME_SOUND_CATCH);
+    }
     if (event & EGG_EVENT_MISSED) {
         show_feedback("MISS!", UI_RED, time_ms);
         show_broken_egg(s_model.last_missed_lane,
                         s_model.last_missed_upper_track, time_ms);
+        queue_sound(GAME_SOUND_BREAK);
     }
-    if (event & EGG_EVENT_GAME_OVER) refresh_message();
+    if (event & EGG_EVENT_GAME_OVER) {
+        refresh_message();
+        queue_sound(GAME_SOUND_OVER);
+    }
 
     if (s_feedback_until_ms && time_ms >= s_feedback_until_ms) {
         lv_obj_add_flag(s_feedback, LV_OBJ_FLAG_HIDDEN);
@@ -490,8 +616,10 @@ static void timer_cb(lv_timer_t *timer)
     }
 }
 
-void egg_catcher_enter(bool buttons_available, bool battery_available)
+void egg_catcher_enter(bool buttons_available, bool battery_available,
+                       bool audio_available)
 {
+    s_audio_available = audio_available;
     s_battery_available = battery_available;
     egg_catcher_model_init(&s_model, (uint32_t)esp_timer_get_time());
     s_input_queue = xQueueCreate(8, sizeof(game_input_t));
@@ -542,9 +670,6 @@ void egg_catcher_enter(bool buttons_available, bool battery_available)
         lv_obj_remove_flag(s_lives[i], LV_OBJ_FLAG_SCROLLABLE);
     }
 
-    s_wolf = lv_image_create(s_screen);
-    lv_obj_remove_flag(s_wolf, LV_OBJ_FLAG_SCROLLABLE);
-
     LV_DRAW_BUF_INIT_STATIC(egg0_buf);
     LV_DRAW_BUF_INIT_STATIC(egg1_buf);
     lv_draw_buf_t *egg_buffers[EGG_CATCHER_MAX_EGGS] = { &egg0_buf, &egg1_buf };
@@ -560,6 +685,11 @@ void egg_catcher_enter(bool buttons_available, bool battery_available)
         lv_obj_remove_flag(s_egg_objects[i], LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_add_flag(s_egg_objects[i], LV_OBJ_FLAG_HIDDEN);
     }
+
+    /* Keep eggs behind the wolf so a caught egg enters the basket instead of
+     * being painted over its rim. */
+    s_wolf = lv_image_create(s_screen);
+    lv_obj_remove_flag(s_wolf, LV_OBJ_FLAG_SCROLLABLE);
 
     LV_DRAW_BUF_INIT_STATIC(break_buf);
     s_break = lv_canvas_create(s_screen);
@@ -615,6 +745,19 @@ void egg_catcher_enter(bool buttons_available, bool battery_available)
     s_feedback_until_ms = 0;
     s_break_until_ms = 0;
     s_timer = lv_timer_create(timer_cb, GAME_TIMER_PERIOD_MS, NULL);
+
+    if (s_audio_available && !s_sound_queue) {
+        s_sound_queue = xQueueCreate(4, sizeof(game_sound_t));
+        if (!s_sound_queue ||
+            xTaskCreate(audio_task, "egg_sound", 3072, NULL, 4, &s_sound_task) != pdPASS) {
+            ESP_LOGE(TAG, "game sound task allocation failed");
+            if (s_sound_queue) {
+                vQueueDelete(s_sound_queue);
+                s_sound_queue = NULL;
+            }
+            s_audio_available = false;
+        }
+    }
 
     log_runtime_health("ready");
 }

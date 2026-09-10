@@ -1,4 +1,5 @@
 #include "bsp_i2c.h"
+#include "bsp_audio.h"
 #include "bsp_display.h"
 #include "bsp_button.h"
 #include "bsp_battery.h"
@@ -29,10 +30,12 @@ void app_main(void)
     bsp_display_backlight(100);
 
     bool buttons_available = bsp_button_init(on_key, NULL) == ESP_OK;
+    bool audio_available = bsp_audio_init() == ESP_OK;
     bool battery_available = bsp_battery_init() == ESP_OK;
     if (bsp_lvgl_lock(1000)) {
-        egg_catcher_enter(buttons_available, battery_available);
+        egg_catcher_enter(buttons_available, battery_available, audio_available);
         bsp_lvgl_unlock();
     }
-    ESP_LOGI(TAG, "Ready: buttons=%d battery=%d", buttons_available, battery_available);
+    ESP_LOGI(TAG, "Ready: buttons=%d battery=%d audio=%d",
+             buttons_available, battery_available, audio_available);
 }
