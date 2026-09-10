@@ -7,4 +7,6 @@ idf_component_register(
          "egg_sprites.c"
     INCLUDE_DIRS "."
     REQUIRES bsp esp_timer
+    EMBED_FILES "assets/egg_game_background.rgb565"
+                "assets/egg_game_wolf.i4"
 )

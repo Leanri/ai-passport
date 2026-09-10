@@ -36,6 +36,12 @@ static void test_catch_scores(void)
 
     egg_catcher_event_t event = egg_catcher_model_advance(
         &model, egg_catcher_model_move_interval_ms(&model));
+    assert((event & EGG_EVENT_CAUGHT) == 0);
+    assert(egg->active && egg->falling);
+    for (int fall = 0; fall < EGG_CATCHER_FALL_STEPS; fall++) {
+        event = egg_catcher_model_advance(
+            &model, egg_catcher_model_move_interval_ms(&model));
+    }
     assert((event & EGG_EVENT_CAUGHT) != 0);
     assert(model.score == 1);
     assert(model.misses == 0);
@@ -69,6 +75,7 @@ static void test_three_misses_end_game(void)
         }
         assert((event & EGG_EVENT_MISSED) != 0);
         assert(model.last_missed_lane == egg->lane);
+        assert(model.last_missed_upper_track == egg->upper_track);
     }
     assert(model.misses == EGG_CATCHER_MAX_MISSES);
     assert(model.state == EGG_GAME_OVER);
