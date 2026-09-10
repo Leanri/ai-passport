@@ -2,10 +2,12 @@
 
 #include "bsp_battery.h"
 #include "egg_catcher_model.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
+#include "freertos/task.h"
 #include "lvgl.h"
 #include "ui_pixel.h"
 
@@ -16,6 +18,7 @@
 #define WOLF_X        75
 #define WOLF_Y        226
 #define GAME_TIMER_PERIOD_MS 30
+#define GAME_DIAGNOSTIC_PERIOD_MS 10000
 #define EGG_SPRITE_SIZE 16
 #define BREAK_SPRITE_W 28
 #define BREAK_SPRITE_H 20
@@ -139,7 +142,10 @@ static uint64_t s_last_tick_ms;
 static uint64_t s_feedback_until_ms;
 static uint64_t s_break_until_ms;
 static uint64_t s_battery_due_ms;
+static uint64_t s_diagnostic_due_ms;
 static uint64_t s_last_press_ms[3];
+static uint32_t s_rendered_score;
+static uint8_t s_rendered_misses;
 static bool s_press_seen[3];
 static bool s_battery_available;
 static bool s_wolf_drawn;
@@ -148,6 +154,29 @@ static bool s_rendered_basket_right;
 static uint64_t now_ms(void)
 {
     return (uint64_t)esp_timer_get_time() / 1000ULL;
+}
+
+/*
+ * Report both LVGL-pool and internal-heap headroom from the LVGL task. The
+ * periodic line is intentionally allocation-free so a reset can be correlated
+ * with the last healthy memory/stack sample captured over USB.
+ */
+static void log_runtime_health(const char *phase)
+{
+    lv_mem_monitor_t lv_memory;
+    lv_mem_monitor(&lv_memory);
+    size_t heap_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    size_t heap_min = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    size_t heap_largest = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    UBaseType_t stack_free = uxTaskGetStackHighWaterMark(NULL);
+
+    ESP_LOGI(TAG,
+             "health[%s]: score=%lu state=%u lvgl_free=%u lvgl_frag=%u%% "
+             "heap_free=%u heap_min=%u heap_largest=%u stack_free_words=%u",
+             phase, (unsigned long)s_model.score, (unsigned)s_model.state,
+             (unsigned)lv_memory.free_size, (unsigned)lv_memory.frag_pct,
+             (unsigned)heap_free, (unsigned)heap_min, (unsigned)heap_largest,
+             (unsigned)stack_free);
 }
 
 static void sprite_px(lv_obj_t *canvas, int width, int height,
@@ -297,10 +326,16 @@ static void draw_wolf(bool basket_right)
 
 static void refresh_dynamic_objects(void)
 {
-    lv_label_set_text_fmt(s_score, "%04lu", (unsigned long)(s_model.score % 10000U));
-    for (int i = 0; i < EGG_CATCHER_MAX_MISSES; i++) {
-        lv_obj_set_style_bg_color(s_lives[i],
-            lv_color_hex(i < s_model.misses ? LCD_RED_COLOR : LCD_HI_COLOR), 0);
+    if (s_rendered_score != s_model.score) {
+        lv_label_set_text_fmt(s_score, "%04lu", (unsigned long)(s_model.score % 10000U));
+        s_rendered_score = s_model.score;
+    }
+    if (s_rendered_misses != s_model.misses) {
+        for (int i = 0; i < EGG_CATCHER_MAX_MISSES; i++) {
+            lv_obj_set_style_bg_color(s_lives[i],
+                lv_color_hex(i < s_model.misses ? LCD_RED_COLOR : LCD_HI_COLOR), 0);
+        }
+        s_rendered_misses = s_model.misses;
     }
 
     if (!s_wolf_drawn || s_rendered_basket_right != s_model.basket_right) {
@@ -449,6 +484,10 @@ static void timer_cb(lv_timer_t *timer)
         update_battery();
         s_battery_due_ms = time_ms + 15000U;
     }
+    if (time_ms >= s_diagnostic_due_ms) {
+        log_runtime_health("playing");
+        s_diagnostic_due_ms = time_ms + GAME_DIAGNOSTIC_PERIOD_MS;
+    }
 }
 
 void egg_catcher_enter(bool buttons_available, bool battery_available)
@@ -462,6 +501,8 @@ void egg_catcher_enter(bool buttons_available, bool battery_available)
         s_press_seen[i] = false;
     }
     s_wolf_drawn = false;
+    s_rendered_score = UINT32_MAX;
+    s_rendered_misses = UINT8_MAX;
 
     s_screen = lv_obj_create(NULL);
     lv_obj_remove_flag(s_screen, LV_OBJ_FLAG_SCROLLABLE);
@@ -570,14 +611,12 @@ void egg_catcher_enter(bool buttons_available, bool battery_available)
 
     s_last_tick_ms = now_ms();
     s_battery_due_ms = s_last_tick_ms + 15000U;
+    s_diagnostic_due_ms = s_last_tick_ms + GAME_DIAGNOSTIC_PERIOD_MS;
     s_feedback_until_ms = 0;
     s_break_until_ms = 0;
     s_timer = lv_timer_create(timer_cb, GAME_TIMER_PERIOD_MS, NULL);
 
-    lv_mem_monitor_t memory;
-    lv_mem_monitor(&memory);
-    ESP_LOGI(TAG, "ready: %u bytes LVGL free, %u%% fragmented",
-             (unsigned)memory.free_size, memory.frag_pct);
+    log_runtime_health("ready");
 }
 
 void egg_catcher_key(bsp_btn_t button, bsp_btn_ev_t event)

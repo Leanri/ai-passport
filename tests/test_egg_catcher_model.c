@@ -120,6 +120,35 @@ static void test_difficulty(void)
     assert(egg_catcher_model_spawn_interval_ms(&model) == 520);
 }
 
+static void test_long_running_session_stays_bounded(void)
+{
+    egg_catcher_model_t model;
+    egg_catcher_model_init(&model, 55);
+    egg_catcher_model_start(&model);
+
+    /* Simulate one hour at the UI timer cadence while catching every egg. */
+    for (int tick = 0; tick < 120000; tick++) {
+        egg_catcher_model_set_side(&model, false);
+        for (int i = 0; i < EGG_CATCHER_MAX_EGGS; i++) {
+            if (model.eggs[i].active) model.eggs[i].lane = EGG_LANE_LEFT;
+        }
+        (void)egg_catcher_model_advance(&model, 30);
+
+        assert(model.state == EGG_GAME_PLAYING);
+        assert(model.misses == 0);
+        assert(model.move_elapsed_ms < egg_catcher_model_move_interval_ms(&model));
+        assert(model.spawn_elapsed_ms < egg_catcher_model_spawn_interval_ms(&model));
+        for (int i = 0; i < EGG_CATCHER_MAX_EGGS; i++) {
+            const egg_catcher_egg_t *egg = &model.eggs[i];
+            if (!egg->active) continue;
+            assert(egg->lane < EGG_CATCHER_LANE_COUNT);
+            assert(egg->step < (egg->falling ? EGG_CATCHER_FALL_STEPS
+                                             : EGG_CATCHER_LANE_STEPS));
+        }
+    }
+    assert(model.score > 100);
+}
+
 int main(void)
 {
     test_initial_state_and_controls();
@@ -127,6 +156,7 @@ int main(void)
     test_three_misses_end_game();
     test_missed_egg_stays_visible_while_falling();
     test_difficulty();
+    test_long_running_session_stays_bounded();
     puts("egg_catcher_model: all tests passed");
     return 0;
 }

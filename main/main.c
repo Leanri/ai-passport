@@ -5,6 +5,7 @@
 #include "bsp_pins.h"
 #include "egg_catcher.h"
 #include "esp_log.h"
+#include "esp_system.h"
 
 static const char *TAG = "main";
 
@@ -16,7 +17,7 @@ static void on_key(bsp_btn_t btn, bsp_btn_ev_t ev, void *user)
 
 void app_main(void)
 {
-    ESP_LOGI(TAG, "Starting Egg Catcher");
+    ESP_LOGI(TAG, "Starting Egg Catcher (reset_reason=%d)", esp_reset_reason());
     bsp_i2c_init();
     bsp_i2c_scan();
 
