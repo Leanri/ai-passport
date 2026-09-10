@@ -146,14 +146,11 @@ static void draw_ramp(egg_catcher_lane_t lane)
 {
     game_point_t start = LANE_START[lane];
     game_point_t end = LANE_END[lane];
-    int direction = end.x > start.x ? 1 : -1;
     canvas_thick_line(start.x, start.y, end.x, end.y, PAL_RED);
-    canvas_thick_line(start.x, start.y + 7, end.x, end.y + 7, PAL_RED);
-    for (int i = 0; i < 4; i++) {
-        int x = start.x + (end.x - start.x) * i / 3;
-        int y = start.y + (end.y - start.y) * i / 3;
-        canvas_line(x, y + 2, x + direction * 5, y + 10, PAL_RED);
-    }
+    int support_x = start.x + (end.x - start.x) * 12 / 25;
+    int support_y = start.y + (end.y - start.y) * 12 / 25;
+    canvas_thick_line(support_x, support_y + 2,
+                      support_x, support_y + 24, PAL_RED);
 }
 
 static void draw_chicken(bool facing_right, int x, int y)
@@ -241,6 +238,22 @@ static void draw_house_details(void)
     canvas_thick_line(25, 55, 35, 55, PAL_RED);
 }
 
+static void draw_side_balconies(void)
+{
+    canvas_thick_line(0, 127, 45, 150, PAL_RED);
+    canvas_thick_line(0, 141, 45, 164, PAL_RED);
+    canvas_thick_line(215, 127, 171, 150, PAL_RED);
+    canvas_thick_line(215, 141, 171, 164, PAL_RED);
+
+    for (int i = 1; i < 5; i++) {
+        int offset = i * 9;
+        int y = 127 + 23 * offset / 45;
+        canvas_thick_line(offset, y + 2, offset, y + 15, PAL_RED);
+        canvas_thick_line(215 - offset, y + 2,
+                          215 - offset, y + 15, PAL_RED);
+    }
+}
+
 static void draw_static_scene(void)
 {
     if (!s_canvas) return;
@@ -250,8 +263,9 @@ static void draw_static_scene(void)
     for (int lane = 0; lane < EGG_CATCHER_LANE_COUNT; lane++) {
         draw_ramp((egg_catcher_lane_t)lane);
     }
-    draw_bush(0, 126);
-    draw_bush(171, 126);
+    draw_side_balconies();
+    draw_bush(0, 154);
+    draw_bush(171, 154);
     draw_grass_patch(6, 31);
     draw_grass_patch(61, 24);
     draw_grass_patch(92, 33);
