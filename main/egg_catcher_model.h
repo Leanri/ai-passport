@@ -9,6 +9,7 @@
 #define EGG_CATCHER_LOWER_FALL_STEPS 3
 #define EGG_CATCHER_UPPER_FALL_STEPS 5
 #define EGG_CATCHER_MAX_MISSES 3
+#define EGG_CATCHER_WIN_SCORE  100U
 
 typedef enum {
     EGG_LANE_LEFT = 0,
@@ -19,6 +20,7 @@ typedef enum {
     EGG_GAME_READY = 0,
     EGG_GAME_PLAYING,
     EGG_GAME_OVER,
+    EGG_GAME_WON,
 } egg_catcher_state_t;
 
 typedef enum {
@@ -28,6 +30,7 @@ typedef enum {
     EGG_EVENT_CAUGHT    = 1 << 2,
     EGG_EVENT_MISSED    = 1 << 3,
     EGG_EVENT_GAME_OVER = 1 << 4,
+    EGG_EVENT_WON       = 1 << 5,
 } egg_catcher_event_t;
 
 typedef struct {

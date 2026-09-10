@@ -19,16 +19,16 @@ egg_catcher_lane_t egg_catcher_model_basket_lane(const egg_catcher_model_t *mode
 
 uint32_t egg_catcher_model_move_interval_ms(const egg_catcher_model_t *model)
 {
-    if (model->score >= 40U) return 240U;
-    if (model->score >= 20U) return 300U;
-    return 360U;
+    uint32_t level = model->score / 15U;
+    if (level > 6U) level = 6U;
+    return 360U - level * 30U;
 }
 
 uint32_t egg_catcher_model_spawn_interval_ms(const egg_catcher_model_t *model)
 {
-    if (model->score >= 40U) return 700U;
-    if (model->score >= 20U) return 850U;
-    return 1000U;
+    uint32_t level = model->score / 15U;
+    if (level > 6U) level = 6U;
+    return 1000U - level * 70U;
 }
 
 uint8_t egg_catcher_model_fall_steps(const egg_catcher_egg_t *egg)
@@ -125,6 +125,13 @@ static egg_catcher_event_t move_eggs(egg_catcher_model_t *model)
                 egg->caught = true;
                 model->score++;
                 event |= EGG_EVENT_CAUGHT;
+                if (model->score >= EGG_CATCHER_WIN_SCORE) {
+                    for (int j = 0; j < EGG_CATCHER_MAX_EGGS; j++) {
+                        model->eggs[j].active = false;
+                    }
+                    model->state = EGG_GAME_WON;
+                    return event | EGG_EVENT_WON;
+                }
             } else if (egg->step >= fall_steps - 1U) {
                 egg->active = false;
                 model->last_missed_lane = egg->lane;

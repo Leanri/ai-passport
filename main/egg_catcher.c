@@ -53,6 +53,7 @@ typedef enum {
     GAME_SOUND_CATCH,
     GAME_SOUND_BREAK,
     GAME_SOUND_OVER,
+    GAME_SOUND_WIN,
 } game_sound_t;
 
 static const char *TAG = "egg_game";
@@ -263,6 +264,10 @@ static void audio_task(void *arg)
                 break;
             case GAME_SOUND_OVER:
                 (void)play_tone_sweep(520, 220, 280, 6500);
+                break;
+            case GAME_SOUND_WIN:
+                (void)play_tone_sweep(620, 920, 130, 7000);
+                (void)play_tone_sweep(820, 1320, 220, 7500);
                 break;
             default:
                 break;
@@ -527,6 +532,9 @@ static void refresh_message(void)
         lv_label_set_text_fmt(s_message, "GAME OVER\nSCORE %04lu\n\nPRESS UP OR DOWN",
                               (unsigned long)(s_model.score % 10000U));
         lv_obj_remove_flag(s_message, LV_OBJ_FLAG_HIDDEN);
+    } else if (s_model.state == EGG_GAME_WON) {
+        lv_label_set_text(s_message, "YOU WIN!\n100 EGGS!\n\nPRESS UP OR DOWN");
+        lv_obj_remove_flag(s_message, LV_OBJ_FLAG_HIDDEN);
     } else {
         lv_obj_add_flag(s_message, LV_OBJ_FLAG_HIDDEN);
     }
@@ -564,7 +572,8 @@ static void handle_input(game_input_t input)
 
     if (!primary_event(input.button, input.event, time_ms)) return;
 
-    if (s_model.state == EGG_GAME_READY || s_model.state == EGG_GAME_OVER) {
+    if (s_model.state == EGG_GAME_READY || s_model.state == EGG_GAME_OVER ||
+        s_model.state == EGG_GAME_WON) {
         egg_catcher_model_start(&s_model);
         queue_sound(GAME_SOUND_START);
         lv_obj_add_flag(s_break, LV_OBJ_FLAG_HIDDEN);
@@ -620,6 +629,10 @@ static void timer_cb(lv_timer_t *timer)
     if (event & EGG_EVENT_GAME_OVER) {
         refresh_message();
         queue_sound(GAME_SOUND_OVER);
+    }
+    if (event & EGG_EVENT_WON) {
+        refresh_message();
+        queue_sound(GAME_SOUND_WIN);
     }
 
     if (s_feedback_until_ms && time_ms >= s_feedback_until_ms) {
