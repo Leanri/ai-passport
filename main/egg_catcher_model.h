@@ -24,6 +24,11 @@ typedef enum {
 } egg_catcher_state_t;
 
 typedef enum {
+    EGG_DIFFICULTY_KIDS = 0,
+    EGG_DIFFICULTY_ADULTS,
+} egg_catcher_difficulty_t;
+
+typedef enum {
     EGG_EVENT_NONE      = 0,
     EGG_EVENT_MOVED     = 1 << 0,
     EGG_EVENT_SPAWNED   = 1 << 1,
@@ -45,6 +50,7 @@ typedef struct {
 typedef struct {
     egg_catcher_egg_t eggs[EGG_CATCHER_MAX_EGGS];
     egg_catcher_state_t state;
+    egg_catcher_difficulty_t difficulty;
     uint32_t score;
     uint32_t rng;
     uint32_t move_elapsed_ms;
@@ -56,6 +62,8 @@ typedef struct {
 } egg_catcher_model_t;
 
 void egg_catcher_model_init(egg_catcher_model_t *model, uint32_t seed);
+void egg_catcher_model_set_difficulty(egg_catcher_model_t *model,
+                                      egg_catcher_difficulty_t difficulty);
 void egg_catcher_model_start(egg_catcher_model_t *model);
 void egg_catcher_model_set_side(egg_catcher_model_t *model, bool right);
 void egg_catcher_model_toggle_side(egg_catcher_model_t *model);
@@ -64,4 +72,6 @@ egg_catcher_event_t egg_catcher_model_advance(egg_catcher_model_t *model,
                                                uint32_t elapsed_ms);
 uint32_t egg_catcher_model_move_interval_ms(const egg_catcher_model_t *model);
 uint32_t egg_catcher_model_spawn_interval_ms(const egg_catcher_model_t *model);
+uint8_t egg_catcher_model_speed_level(const egg_catcher_model_t *model);
+bool egg_catcher_model_speed_increased(const egg_catcher_model_t *model);
 uint8_t egg_catcher_model_fall_steps(const egg_catcher_egg_t *egg);

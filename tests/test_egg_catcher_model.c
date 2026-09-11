@@ -16,6 +16,7 @@ static void test_initial_state_and_controls(void)
     egg_catcher_model_t model;
     egg_catcher_model_init(&model, 1234);
     assert(model.state == EGG_GAME_READY);
+    assert(model.difficulty == EGG_DIFFICULTY_KIDS);
     assert(egg_catcher_model_basket_lane(&model) == EGG_LANE_LEFT);
 
     egg_catcher_model_set_side(&model, true);
@@ -158,36 +159,56 @@ static void test_difficulty(void)
     egg_catcher_model_start(&model);
 
     model.score = 14;
+    assert(egg_catcher_model_move_interval_ms(&model) == 420);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 1200);
+    assert(egg_catcher_model_speed_level(&model) == 0);
+    assert(!egg_catcher_model_speed_increased(&model));
+
+    model.score = 15;
+    assert(egg_catcher_model_move_interval_ms(&model) == 370);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 1080);
+    assert(egg_catcher_model_speed_increased(&model));
+
+    model.score = 70;
+    assert(egg_catcher_model_move_interval_ms(&model) == 280);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 800);
+    assert(!egg_catcher_model_speed_increased(&model));
+
+    model.score = 90;
+    assert(egg_catcher_model_move_interval_ms(&model) == 240);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 670);
+    assert(egg_catcher_model_speed_level(&model) == 6);
+    assert(egg_catcher_model_speed_increased(&model));
+
+    egg_catcher_model_set_difficulty(&model, EGG_DIFFICULTY_ADULTS);
+    egg_catcher_model_start(&model);
+    assert(model.difficulty == EGG_DIFFICULTY_ADULTS);
     assert(egg_catcher_model_move_interval_ms(&model) == 360);
     assert(egg_catcher_model_spawn_interval_ms(&model) == 1000);
 
-    model.score = 15;
-    assert(egg_catcher_model_move_interval_ms(&model) == 300);
-    assert(egg_catcher_model_spawn_interval_ms(&model) == 850);
-
-    model.score = 30;
-    assert(egg_catcher_model_move_interval_ms(&model) == 260);
-    assert(egg_catcher_model_spawn_interval_ms(&model) == 740);
-
-    model.score = 45;
-    assert(egg_catcher_model_move_interval_ms(&model) == 230);
-    assert(egg_catcher_model_spawn_interval_ms(&model) == 650);
-
     model.score = 60;
-    assert(egg_catcher_model_move_interval_ms(&model) == 210);
-    assert(egg_catcher_model_spawn_interval_ms(&model) == 580);
+    assert(egg_catcher_model_move_interval_ms(&model) == 205);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 560);
+    assert(egg_catcher_model_speed_increased(&model));
 
-    model.score = 75;
-    assert(egg_catcher_model_move_interval_ms(&model) == 195);
-    assert(egg_catcher_model_spawn_interval_ms(&model) == 520);
+    model.score = 69;
+    assert(egg_catcher_model_move_interval_ms(&model) == 205);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 560);
+    assert(!egg_catcher_model_speed_increased(&model));
 
-    model.score = 90;
-    assert(egg_catcher_model_move_interval_ms(&model) == 180);
-    assert(egg_catcher_model_spawn_interval_ms(&model) == 470);
+    model.score = 70;
+    assert(egg_catcher_model_move_interval_ms(&model) == 165);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 440);
+    assert(egg_catcher_model_speed_increased(&model));
+
+    model.score = 85;
+    assert(egg_catcher_model_move_interval_ms(&model) == 145);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 380);
+    assert(egg_catcher_model_speed_increased(&model));
 
     model.score = EGG_CATCHER_WIN_SCORE;
-    assert(egg_catcher_model_move_interval_ms(&model) == 180);
-    assert(egg_catcher_model_spawn_interval_ms(&model) == 470);
+    assert(egg_catcher_model_move_interval_ms(&model) == 145);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 380);
 }
 
 static void test_upper_eggs_get_more_fall_frames(void)

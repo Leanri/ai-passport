@@ -17,24 +17,57 @@ egg_catcher_lane_t egg_catcher_model_basket_lane(const egg_catcher_model_t *mode
     return model->basket_right ? EGG_LANE_RIGHT : EGG_LANE_LEFT;
 }
 
+static uint8_t speed_level_at(egg_catcher_difficulty_t difficulty,
+                              uint32_t score)
+{
+    static const uint8_t kids_thresholds[] = { 15U, 30U, 45U, 60U, 75U, 90U };
+    static const uint8_t adult_thresholds[] = { 15U, 30U, 45U, 60U, 70U, 85U };
+    const uint8_t *thresholds = difficulty == EGG_DIFFICULTY_ADULTS
+                                    ? adult_thresholds : kids_thresholds;
+    uint8_t level = 0;
+
+    while (level < sizeof(kids_thresholds) && score >= thresholds[level]) {
+        level++;
+    }
+    return level;
+}
+
+uint8_t egg_catcher_model_speed_level(const egg_catcher_model_t *model)
+{
+    return speed_level_at(model->difficulty, model->score);
+}
+
+bool egg_catcher_model_speed_increased(const egg_catcher_model_t *model)
+{
+    if (model->score == 0U) return false;
+    return speed_level_at(model->difficulty, model->score) >
+           speed_level_at(model->difficulty, model->score - 1U);
+}
+
 uint32_t egg_catcher_model_move_interval_ms(const egg_catcher_model_t *model)
 {
-    static const uint16_t interval_ms[] = {
-        360U, 300U, 260U, 230U, 210U, 195U, 180U,
+    static const uint16_t kids_interval_ms[] = {
+        420U, 370U, 330U, 300U, 280U, 260U, 240U,
     };
-    uint32_t level = model->score / 15U;
-    if (level > 6U) level = 6U;
-    return interval_ms[level];
+    static const uint16_t adult_interval_ms[] = {
+        360U, 300U, 260U, 230U, 205U, 165U, 145U,
+    };
+    const uint16_t *intervals = model->difficulty == EGG_DIFFICULTY_ADULTS
+                                    ? adult_interval_ms : kids_interval_ms;
+    return intervals[egg_catcher_model_speed_level(model)];
 }
 
 uint32_t egg_catcher_model_spawn_interval_ms(const egg_catcher_model_t *model)
 {
-    static const uint16_t interval_ms[] = {
-        1000U, 850U, 740U, 650U, 580U, 520U, 470U,
+    static const uint16_t kids_interval_ms[] = {
+        1200U, 1080U, 970U, 880U, 800U, 730U, 670U,
     };
-    uint32_t level = model->score / 15U;
-    if (level > 6U) level = 6U;
-    return interval_ms[level];
+    static const uint16_t adult_interval_ms[] = {
+        1000U, 850U, 740U, 650U, 560U, 440U, 380U,
+    };
+    const uint16_t *intervals = model->difficulty == EGG_DIFFICULTY_ADULTS
+                                    ? adult_interval_ms : kids_interval_ms;
+    return intervals[egg_catcher_model_speed_level(model)];
 }
 
 uint8_t egg_catcher_model_fall_steps(const egg_catcher_egg_t *egg)
@@ -77,15 +110,25 @@ void egg_catcher_model_init(egg_catcher_model_t *model, uint32_t seed)
     memset(model, 0, sizeof(*model));
     model->rng = seed ? seed : 0xC001D00DU;
     model->state = EGG_GAME_READY;
+    model->difficulty = EGG_DIFFICULTY_KIDS;
     model->basket_right = false;
+}
+
+void egg_catcher_model_set_difficulty(egg_catcher_model_t *model,
+                                      egg_catcher_difficulty_t difficulty)
+{
+    model->difficulty = difficulty == EGG_DIFFICULTY_ADULTS
+                            ? EGG_DIFFICULTY_ADULTS : EGG_DIFFICULTY_KIDS;
 }
 
 void egg_catcher_model_start(egg_catcher_model_t *model)
 {
     uint32_t seed = model->rng ? model->rng : 0xC001D00DU;
+    egg_catcher_difficulty_t difficulty = model->difficulty;
     memset(model, 0, sizeof(*model));
     model->rng = seed;
     model->state = EGG_GAME_PLAYING;
+    model->difficulty = difficulty;
     model->basket_right = false;
     (void)spawn_egg(model);
 }

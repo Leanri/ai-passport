@@ -714,10 +714,11 @@ static void refresh_message(void)
     }
     if (s_model.state == EGG_GAME_READY) {
         lv_label_set_text(s_message,
-                          "UP: LEFT  DOWN: RIGHT\n\nPRESS UP OR DOWN\nHOLD OK: EXIT");
+                          "CHOOSE MODE\n\nUP: KIDS\nDOWN: ADULTS");
         lv_obj_remove_flag(s_message, LV_OBJ_FLAG_HIDDEN);
     } else if (s_model.state == EGG_GAME_OVER) {
-        lv_label_set_text_fmt(s_message, "GAME OVER\nSCORE %04lu\n\nPRESS UP OR DOWN",
+        lv_label_set_text_fmt(s_message,
+                              "GAME OVER\nSCORE %04lu\n\nUP: KIDS\nDOWN: ADULTS",
                               (unsigned long)(s_model.score % 10000U));
         lv_obj_remove_flag(s_message, LV_OBJ_FLAG_HIDDEN);
     } else if (s_model.state == EGG_GAME_WON) {
@@ -753,6 +754,8 @@ static bool primary_event(bsp_btn_t button, bsp_btn_ev_t event, uint64_t time_ms
            (!s_press_seen[button] || time_ms - s_last_press_ms[button] > 1500U);
 }
 
+static void show_feedback(const char *text, uint32_t color, uint64_t time_ms);
+
 static void handle_input(game_input_t input)
 {
     uint64_t time_ms = now_ms();
@@ -762,9 +765,14 @@ static void handle_input(game_input_t input)
 
     if (s_model.state == EGG_GAME_READY || s_model.state == EGG_GAME_OVER ||
         s_model.state == EGG_GAME_WON) {
+        bool adults = input.button == BSP_BTN_DOWN;
+        egg_catcher_model_set_difficulty(
+            &s_model, adults ? EGG_DIFFICULTY_ADULTS : EGG_DIFFICULTY_KIDS);
         egg_catcher_model_start(&s_model);
         reset_catch_animations();
         queue_sound(GAME_SOUND_START);
+        show_feedback(adults ? "ADULT MODE" : "KIDS MODE",
+                      adults ? UI_RED : UI_GRASS_DARK, time_ms);
         lv_obj_add_flag(s_break, LV_OBJ_FLAG_HIDDEN);
         s_break_until_ms = 0;
         s_last_tick_ms = time_ms;
@@ -808,7 +816,7 @@ static void timer_cb(lv_timer_t *timer)
     }
     if (event & EGG_EVENT_CAUGHT) {
         if (s_model.score < EGG_CATCHER_WIN_SCORE &&
-            s_model.score % 15U == 0U) {
+            egg_catcher_model_speed_increased(&s_model)) {
             show_feedback("SPEED UP!", UI_RED, time_ms);
         } else {
             show_feedback("CATCH!", UI_GRASS_DARK, time_ms);

@@ -9,7 +9,7 @@
 - Added the user-supplied full-screen victory artwork shown immediately after the fox catches the hundredth egg.
 - Removed the interim FoloToy demo menu so the standalone Egg Catcher screen appears at power-on; egg movement begins only after an `UP` or `DOWN` press.
 - Added transparent mirrored hand/basket-front layers and a fixed 180 ms catch animation: the egg remains fully visible for 90 ms, sinks no more than four pixels behind the basket front for 90 ms, and then disappears without any below-basket frame.
-- Made each 15-egg difficulty step visibly stronger while keeping one shared movement speed for both tracks, and added a `SPEED UP!` cue at every threshold.
+- Added pre-game `KIDS` and `ADULTS` choices: Kids stays slower through 100 eggs, while Adults follows the former opening pace and receives a pronounced speed increase at 70; both tracks still share one movement speed and every threshold shows `SPEED UP!`.
 
 - Added the standalone Egg Catcher game: two-lane egg movement, direct two-button left/right controls, score, misses, restart flow, increasing difficulty, battery status, two distinct reference-derived wolf poses, detailed hens, chutes, houses and shrubs, and host-tested game logic.
 - Restored the Egg Catcher background's original thin chutes without the duplicate overpaint, completed the wolf's missing rear foot in both poses, reduced repeated LVGL label updates, and added periodic memory/stack diagnostics plus a one-hour model stress test for restart investigation.
