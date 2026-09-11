@@ -18,13 +18,13 @@
 #define FOX_COLOR_W   110
 #define FOX_COLOR_H   110
 #define FOX_X         65
-#define FOX_Y         192
-#define BASKET_FRONT_W 27
-#define BASKET_FRONT_H 16
-#define BASKET_FRONT_LEFT_X  68
-#define BASKET_FRONT_RIGHT_X 145
-#define BASKET_FRONT_Y       245
-#define BASKET_FRONT_BOTTOM_Y 258
+#define FOX_Y         200
+#define BASKET_FRONT_W 19
+#define BASKET_FRONT_H 11
+#define BASKET_FRONT_LEFT_X  74
+#define BASKET_FRONT_RIGHT_X 147
+#define BASKET_FRONT_Y       266
+#define BASKET_FRONT_BOTTOM_Y 276
 #define GAME_TIMER_PERIOD_MS 30
 #define GAME_DIAGNOSTIC_PERIOD_MS 10000
 #define GAME_AUDIO_SAMPLE_RATE 16000
@@ -57,6 +57,7 @@ typedef struct {
 typedef enum {
     GAME_SOUND_START = 1,
     GAME_SOUND_CATCH,
+    GAME_SOUND_LEVEL_UP,
     GAME_SOUND_BREAK,
     GAME_SOUND_OVER,
     GAME_SOUND_WIN,
@@ -78,8 +79,8 @@ static const int8_t FALL_X[2][EGG_CATCHER_UPPER_FALL_STEPS] = {
     { 2, 4, 6, 8, 10 },
 };
 static const int8_t FALL_Y[2][EGG_CATCHER_UPPER_FALL_STEPS] = {
-    { 3, 9, 29, 29, 29 },
-    { 10, 22, 34, 48, 64 },
+    { 16, 30, 50, 50, 50 },
+    { 18, 35, 52, 69, 85 },
 };
 
 extern const uint8_t egg_game_background_start[]
@@ -303,6 +304,15 @@ static bool play_crack(void)
     return play_tone_sweep(260, 110, 90, 6000);
 }
 
+static bool play_level_up(void)
+{
+    /* Three rising notes are deliberately longer and lower-pitched than the
+     * ordinary catch chirp, so the speed transition is unmistakable. */
+    if (!play_tone_sweep(620, 720, 70, 7000)) return false;
+    if (!play_tone_sweep(820, 940, 80, 7200)) return false;
+    return play_tone_sweep(1080, 1500, 160, 7800);
+}
+
 static void audio_task(void *arg)
 {
     (void)arg;
@@ -327,6 +337,9 @@ static void audio_task(void *arg)
                 break;
             case GAME_SOUND_CATCH:
                 (void)play_tone_sweep(760, 1450, 130, 7000);
+                break;
+            case GAME_SOUND_LEVEL_UP:
+                (void)play_level_up();
                 break;
             case GAME_SOUND_BREAK:
                 (void)play_crack();
@@ -355,6 +368,19 @@ static void queue_sound(game_sound_t sound)
     if (xQueueSend(s_sound_queue, &sound, 0) != pdTRUE) {
         ESP_LOGW(TAG, "sound queue full: event=%d", sound);
     }
+}
+
+static void queue_priority_sound(game_sound_t sound)
+{
+    if (!s_audio_available || !s_sound_queue) return;
+    if (xQueueSendToFront(s_sound_queue, &sound, 0) == pdTRUE) return;
+
+    /* A level-up cue must not be lost behind queued catch chirps. Discard one
+     * stale sound and put the level cue at the front without blocking LVGL. */
+    game_sound_t discarded;
+    if (xQueueReceive(s_sound_queue, &discarded, 0) == pdTRUE &&
+        xQueueSendToFront(s_sound_queue, &sound, 0) == pdTRUE) return;
+    ESP_LOGW(TAG, "sound queue full: priority event=%d", sound);
 }
 
 static void stop_sound_worker(void)
@@ -844,19 +870,26 @@ static void timer_cb(lv_timer_t *timer)
     if (delta > 500U) delta = 500U;
     s_last_tick_ms = time_ms;
 
+    uint8_t speed_level_before = egg_catcher_model_speed_level(&s_model);
     egg_catcher_event_t event = egg_catcher_model_advance(&s_model, (uint32_t)delta);
     if (event & EGG_EVENT_CAUGHT) record_new_catches(time_ms);
     if (event != EGG_EVENT_NONE || catch_animation_active()) {
         refresh_dynamic_objects(time_ms);
     }
     if (event & EGG_EVENT_CAUGHT) {
-        if (s_model.score < EGG_CATCHER_WIN_SCORE &&
-            egg_catcher_model_speed_increased(&s_model)) {
+        bool speed_increased = s_model.score < EGG_CATCHER_WIN_SCORE &&
+                               egg_catcher_model_speed_level(&s_model) >
+                                   speed_level_before;
+        if (speed_increased) {
             show_feedback("SPEED UP!", UI_RED, time_ms);
         } else {
             show_feedback("CATCH!", UI_GRASS_DARK, time_ms);
         }
-        queue_sound(GAME_SOUND_CATCH);
+        if (speed_increased) {
+            queue_priority_sound(GAME_SOUND_LEVEL_UP);
+        } else {
+            queue_sound(GAME_SOUND_CATCH);
+        }
     }
     if (event & EGG_EVENT_MISSED) {
         show_feedback("MISS!", UI_RED, time_ms);
