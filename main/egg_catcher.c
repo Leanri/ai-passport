@@ -47,7 +47,6 @@ enum {
 
 typedef struct {
     bsp_btn_t button;
-    bsp_btn_ev_t event;
 } game_input_t;
 
 typedef struct {
@@ -221,10 +220,8 @@ static uint64_t s_feedback_until_ms;
 static uint64_t s_break_until_ms;
 static uint64_t s_battery_due_ms;
 static uint64_t s_diagnostic_due_ms;
-static uint64_t s_last_press_ms[3];
 static uint32_t s_rendered_score;
 static uint8_t s_rendered_misses;
-static bool s_press_seen[3];
 /* 0 means idle, UINT64_MAX means the current caught egg already finished its
  * visual. The sentinel prevents a consumed model egg from restarting the
  * animation before its slot is reused. */
@@ -580,17 +577,12 @@ static void place_egg_behind_fox(int index)
     lv_obj_move_background(s_background);
 }
 
-static void place_caught_egg(int index, egg_catch_visual_phase_t phase)
+static void place_caught_egg(int index)
 {
-    if (phase == EGG_CATCH_VISUAL_FRONT) {
-        /* Contact: the full fox remains below the complete visible egg. */
-        lv_obj_move_foreground(s_egg_objects[index]);
-    } else {
-        /* Sinking: the compact hand/front-wall crop masks the lower egg. */
-        lv_obj_move_foreground(s_egg_objects[index]);
-        lv_obj_move_foreground(s_basket_front);
-        lv_obj_remove_flag(s_basket_front, LV_OBJ_FLAG_HIDDEN);
-    }
+    /* The basket-front object is raised once after every egg has been placed.
+     * Deferring that final move makes the order deterministic even when two
+     * caught animations occupy different egg slots. */
+    lv_obj_move_foreground(s_egg_objects[index]);
 }
 
 static void reset_catch_animations(void)
@@ -618,8 +610,21 @@ static bool catch_animation_active(void)
     return false;
 }
 
+static void finish_catch_animations(void)
+{
+    for (int i = 0; i < EGG_CATCHER_MAX_EGGS; i++) {
+        if (s_caught_since_ms[i] == 0 ||
+            s_caught_since_ms[i] == UINT64_MAX) continue;
+        s_caught_since_ms[i] = UINT64_MAX;
+        place_egg_behind_fox(i);
+        lv_obj_add_flag(s_egg_objects[i], LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
 static void refresh_dynamic_objects(uint64_t time_ms)
 {
+    bool basket_front_visible = false;
+
     if (s_rendered_score != s_model.score) {
         lv_label_set_text_fmt(s_score, "%04lu", (unsigned long)(s_model.score % 10000U));
         s_rendered_score = s_model.score;
@@ -635,8 +640,8 @@ static void refresh_dynamic_objects(uint64_t time_ms)
     if (!s_fox_drawn || s_rendered_basket_right != s_model.basket_right) {
         draw_fox(s_model.basket_right);
     }
-    /* The full fox already contains the basket. Show its duplicate front crop
-     * only during the 90 ms sinking phase to avoid darkening alpha edges. */
+    /* The full fox already contains the basket. The duplicate front crop is
+     * shown only while a caught egg is visible. */
     lv_obj_add_flag(s_basket_front, LV_OBJ_FLAG_HIDDEN);
 
     for (int i = 0; i < EGG_CATCHER_MAX_EGGS; i++) {
@@ -676,7 +681,8 @@ static void refresh_dynamic_objects(uint64_t time_ms)
                 clip_egg_below(object, egg_top, BASKET_FRONT_BOTTOM_Y);
             }
             lv_obj_set_pos(object, x - EGG_SPRITE_SIZE / 2, egg_top);
-            place_caught_egg(i, visual.phase);
+            place_caught_egg(i);
+            basket_front_visible = true;
             lv_obj_remove_flag(object, LV_OBJ_FLAG_HIDDEN);
             continue;
         }
@@ -713,6 +719,13 @@ static void refresh_dynamic_objects(uint64_t time_ms)
         lv_obj_set_pos(object, x - EGG_SPRITE_SIZE / 2,
                        y - EGG_SPRITE_SIZE / 2);
         lv_obj_remove_flag(object, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    if (basket_front_visible) {
+        /* This must be the final foreground move. No caught egg may ever be
+         * painted above the hand/front wall, regardless of egg-slot order. */
+        lv_obj_move_foreground(s_basket_front);
+        lv_obj_remove_flag(s_basket_front, LV_OBJ_FLAG_HIDDEN);
     }
 }
 
@@ -774,25 +787,12 @@ static void update_battery(void)
     lv_obj_remove_flag(s_battery, LV_OBJ_FLAG_HIDDEN);
 }
 
-static bool primary_event(bsp_btn_t button, bsp_btn_ev_t event, uint64_t time_ms)
-{
-    if ((unsigned)button >= 3U) return false;
-    if (event == BSP_BTN_PRESS) {
-        s_press_seen[button] = true;
-        s_last_press_ms[button] = time_ms;
-        return true;
-    }
-    return event == BSP_BTN_CLICK &&
-           (!s_press_seen[button] || time_ms - s_last_press_ms[button] > 1500U);
-}
-
 static void show_feedback(const char *text, uint32_t color, uint64_t time_ms);
 
 static void handle_input(game_input_t input)
 {
     uint64_t time_ms = now_ms();
 
-    if (!primary_event(input.button, input.event, time_ms)) return;
     if (input.button == BSP_BTN_OK) return;
 
     if (s_model.state == EGG_GAME_READY || s_model.state == EGG_GAME_OVER ||
@@ -811,10 +811,13 @@ static void handle_input(game_input_t input)
     }
     if (s_model.state != EGG_GAME_PLAYING) return;
 
-    if (input.button == BSP_BTN_UP) {
-        egg_catcher_model_set_side(&s_model, false);
-    } else if (input.button == BSP_BTN_DOWN) {
-        egg_catcher_model_set_side(&s_model, true);
+    bool basket_right = input.button == BSP_BTN_DOWN;
+    if (s_model.basket_right != basket_right) {
+        /* A catch is already final in the model. If the player turns during
+         * its short visual, finish that visual before moving the only basket
+         * front to the opposite side. */
+        finish_catch_animations();
+        egg_catcher_model_set_side(&s_model, basket_right);
     }
     refresh_message();
     refresh_dynamic_objects(time_ms);
@@ -894,12 +897,8 @@ void egg_catcher_enter(bool buttons_available, bool battery_available,
     s_audio_available = audio_available;
     s_battery_available = battery_available;
     egg_catcher_model_init(&s_model, (uint32_t)esp_timer_get_time());
-    s_input_queue = xQueueCreate(8, sizeof(game_input_t));
+    s_input_queue = xQueueCreate(16, sizeof(game_input_t));
     if (!s_input_queue) ESP_LOGE(TAG, "input queue allocation failed");
-    for (int i = 0; i < 3; i++) {
-        s_last_press_ms[i] = 0;
-        s_press_seen[i] = false;
-    }
     reset_catch_animations();
     s_fox_drawn = false;
     s_rendered_score = UINT32_MAX;
@@ -1091,9 +1090,10 @@ void egg_catcher_exit(void)
 
 void egg_catcher_key(bsp_btn_t button, bsp_btn_ev_t event)
 {
-    if (button == BSP_BTN_OK) return;
+    if (event != BSP_BTN_PRESS || button == BSP_BTN_OK) return;
+    if (button != BSP_BTN_UP && button != BSP_BTN_DOWN) return;
     if (!s_input_queue) return;
-    game_input_t input = { .button = button, .event = event };
+    game_input_t input = { .button = button };
     if (xQueueSend(s_input_queue, &input, 0) != pdTRUE) {
         ESP_LOGW(TAG, "input queue full: key=%d event=%d", button, event);
     }

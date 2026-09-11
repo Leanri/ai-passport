@@ -8,40 +8,20 @@
 #include "egg_catcher.h"
 #include "esp_log.h"
 #include "esp_sleep.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/queue.h"
-#include "lvgl.h"
 
 static const char *TAG = "main";
 
-typedef struct {
-    bsp_btn_t button;
-    bsp_btn_ev_t event;
-} app_input_t;
-
-static QueueHandle_t s_input_queue;
 static bool s_buttons_available;
 static bool s_audio_available;
 static bool s_battery_available;
 
-static void input_timer_cb(lv_timer_t *timer)
-{
-    (void)timer;
-    app_input_t input;
-    while (s_input_queue && xQueueReceive(s_input_queue, &input, 0) == pdTRUE) {
-        egg_catcher_key(input.button, input.event);
-    }
-}
-
 static void on_key(bsp_btn_t button, bsp_btn_ev_t event, void *user)
 {
     (void)user;
-    if (!s_input_queue) return;
-
-    app_input_t input = { .button = button, .event = event };
-    if (xQueueSend(s_input_queue, &input, 0) != pdTRUE) {
-        ESP_LOGW(TAG, "input queue full: key=%d event=%d", button, event);
-    }
+    /* PRESS is the only event the game needs. Forward it directly to the
+     * game's non-blocking queue so CLICK/DOUBLE/LONG events cannot delay or
+     * crowd out a direction change. */
+    if (event == BSP_BTN_PRESS) egg_catcher_key(button, event);
 }
 
 void app_main(void)
@@ -63,16 +43,13 @@ void app_main(void)
     }
     bsp_display_backlight(100);
 
-    s_input_queue = xQueueCreate(12, sizeof(app_input_t));
-    s_buttons_available =
-        s_input_queue && bsp_button_init(on_key, NULL) == ESP_OK;
+    s_buttons_available = bsp_button_init(on_key, NULL) == ESP_OK;
     s_audio_available = bsp_audio_init() == ESP_OK;
     s_battery_available = bsp_battery_init() == ESP_OK;
 
     if (bsp_lvgl_lock(1000)) {
         egg_catcher_enter(s_buttons_available, s_battery_available,
                           s_audio_available);
-        (void)lv_timer_create(input_timer_cb, 20, NULL);
         bsp_lvgl_unlock();
     }
 
