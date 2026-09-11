@@ -24,6 +24,12 @@
 - 许可允许时保留可编辑源文件，并记录来源与许可。
 - 图片中不得包含设备二维码秘密、凭证或个人数据。
 
+### 接鸡蛋游戏背景
+
+- 源文件：`images/egg-catcher-background-source.png`，保留自此个人 fork 的现有 240 × 320 RGB 游戏背景。
+- 集成方式：`tools/prepare_egg_background.py` 使用相邻的原始沙地和地面纹理替换原角色区域内明显的平滑擦除痕迹，仅混合修复边界，并将小端 RGB565 像素写入 `main/assets/egg_game_background.rgb565`。
+- 重新生成：安装 Pillow 后，在仓库根目录运行 `python tools/prepare_egg_background.py`。
+
 ### 接鸡蛋游戏狐狸
 
 - 源文件：`images/egg-catcher-fox-source.png`，911 × 927 RGBA 图片，由 fork 所有者提供并仅授权在此个人 fork 中使用；不声明更广泛的再分发许可。
