@@ -35,7 +35,7 @@ Store reusable source images and generated display assets in `images/`.
 
 ### Egg Catcher victory screen
 
-- Source: `images/egg-catcher-win-source.png`, a 699 × 929 RGBA image supplied by the fork owner for use in this personal fork; no broader redistribution license is claimed.
+- Source: `images/egg-catcher-win-source.png`, a 1086 × 1448 RGB image supplied by the fork owner for use in this personal fork; no broader redistribution license is claimed.
 - Integration: `tools/prepare_egg_win.py` center-fits the artwork to the 240 × 320 display and writes little-endian RGB565 pixels to `main/assets/egg_game_win.rgb565`. The game displays it after the hundredth catch.
 - Regeneration: install Pillow and run `python tools/prepare_egg_win.py` from the repository root.
 

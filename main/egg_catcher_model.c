@@ -21,12 +21,17 @@ static uint8_t speed_level_at(egg_catcher_difficulty_t difficulty,
                               uint32_t score)
 {
     static const uint8_t kids_thresholds[] = { 15U, 30U, 45U, 60U, 75U, 90U };
-    static const uint8_t adult_thresholds[] = { 15U, 30U, 45U, 60U, 70U, 85U };
-    const uint8_t *thresholds = difficulty == EGG_DIFFICULTY_ADULTS
-                                    ? adult_thresholds : kids_thresholds;
+    static const uint8_t adult_thresholds[] = {
+        15U, 30U, 45U, 50U, 65U, 80U, 90U,
+    };
+    const bool adults = difficulty == EGG_DIFFICULTY_ADULTS;
+    const uint8_t *thresholds = adults ? adult_thresholds : kids_thresholds;
+    const size_t threshold_count = adults
+        ? sizeof(adult_thresholds) / sizeof(adult_thresholds[0])
+        : sizeof(kids_thresholds) / sizeof(kids_thresholds[0]);
     uint8_t level = 0;
 
-    while (level < sizeof(kids_thresholds) && score >= thresholds[level]) {
+    while (level < threshold_count && score >= thresholds[level]) {
         level++;
     }
     return level;
@@ -50,7 +55,7 @@ uint32_t egg_catcher_model_move_interval_ms(const egg_catcher_model_t *model)
         420U, 370U, 330U, 300U, 280U, 260U, 240U,
     };
     static const uint16_t adult_interval_ms[] = {
-        360U, 300U, 260U, 230U, 205U, 165U, 145U,
+        360U, 300U, 260U, 230U, 195U, 170U, 145U, 130U,
     };
     const uint16_t *intervals = model->difficulty == EGG_DIFFICULTY_ADULTS
                                     ? adult_interval_ms : kids_interval_ms;
@@ -63,7 +68,7 @@ uint32_t egg_catcher_model_spawn_interval_ms(const egg_catcher_model_t *model)
         1200U, 1080U, 970U, 880U, 800U, 730U, 670U,
     };
     static const uint16_t adult_interval_ms[] = {
-        1000U, 850U, 740U, 650U, 560U, 440U, 380U,
+        1000U, 850U, 740U, 650U, 520U, 440U, 370U, 320U,
     };
     const uint16_t *intervals = model->difficulty == EGG_DIFFICULTY_ADULTS
                                     ? adult_interval_ms : kids_interval_ms;
@@ -74,6 +79,24 @@ uint8_t egg_catcher_model_fall_steps(const egg_catcher_egg_t *egg)
 {
     return egg->upper_track ? EGG_CATCHER_UPPER_FALL_STEPS
                             : EGG_CATCHER_LOWER_FALL_STEPS;
+}
+
+static uint32_t random_spawn_delay_ms(egg_catcher_model_t *model)
+{
+    const bool adults = model->difficulty == EGG_DIFFICULTY_ADULTS;
+    const uint32_t base = egg_catcher_model_spawn_interval_ms(model);
+    const uint32_t min_percent = adults ? 75U : 90U;
+    const uint32_t max_percent = adults ? 125U : 130U;
+    const uint32_t percent = min_percent +
+        random_next(model) % (max_percent - min_percent + 1U);
+    uint32_t delay = base * percent / 100U;
+
+    /* Kids always get at least three movement beats between new eggs. Adults
+     * may receive a two-beat sequence, which keeps the late game demanding
+     * without making the opening unpredictable. */
+    uint32_t minimum = egg_catcher_model_move_interval_ms(model) *
+                       (adults ? 2U : 3U);
+    return delay < minimum ? minimum : delay;
 }
 
 static bool spawn_egg(egg_catcher_model_t *model)
@@ -131,6 +154,7 @@ void egg_catcher_model_start(egg_catcher_model_t *model)
     model->difficulty = difficulty;
     model->basket_right = false;
     (void)spawn_egg(model);
+    model->spawn_delay_ms = random_spawn_delay_ms(model);
 }
 
 void egg_catcher_model_set_side(egg_catcher_model_t *model, bool right)
@@ -220,12 +244,14 @@ egg_catcher_event_t egg_catcher_model_advance(egg_catcher_model_t *model,
         move_interval = egg_catcher_model_move_interval_ms(model);
     }
 
-    uint32_t spawn_interval = egg_catcher_model_spawn_interval_ms(model);
-    while (model->spawn_elapsed_ms >= spawn_interval &&
+    if (model->spawn_delay_ms == 0U) {
+        model->spawn_delay_ms = random_spawn_delay_ms(model);
+    }
+    while (model->spawn_elapsed_ms >= model->spawn_delay_ms &&
            model->state == EGG_GAME_PLAYING) {
-        model->spawn_elapsed_ms -= spawn_interval;
+        model->spawn_elapsed_ms -= model->spawn_delay_ms;
         if (spawn_egg(model)) event |= EGG_EVENT_SPAWNED;
-        spawn_interval = egg_catcher_model_spawn_interval_ms(model);
+        model->spawn_delay_ms = random_spawn_delay_ms(model);
     }
     return event;
 }

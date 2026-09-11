@@ -18,13 +18,13 @@
 #define FOX_COLOR_W   110
 #define FOX_COLOR_H   110
 #define FOX_X         65
-#define FOX_Y         210
+#define FOX_Y         192
 #define BASKET_FRONT_W 27
 #define BASKET_FRONT_H 16
 #define BASKET_FRONT_LEFT_X  68
 #define BASKET_FRONT_RIGHT_X 145
-#define BASKET_FRONT_Y       263
-#define BASKET_FRONT_BOTTOM_Y 276
+#define BASKET_FRONT_Y       245
+#define BASKET_FRONT_BOTTOM_Y 258
 #define GAME_TIMER_PERIOD_MS 30
 #define GAME_DIAGNOSTIC_PERIOD_MS 10000
 #define GAME_AUDIO_SAMPLE_RATE 16000
@@ -78,8 +78,8 @@ static const int8_t FALL_X[2][EGG_CATCHER_UPPER_FALL_STEPS] = {
     { 2, 4, 6, 8, 10 },
 };
 static const int8_t FALL_Y[2][EGG_CATCHER_UPPER_FALL_STEPS] = {
-    { 10, 27, 47, 47, 47 },
-    { 16, 33, 49, 66, 82 },
+    { 3, 9, 29, 29, 29 },
+    { 10, 22, 34, 48, 64 },
 };
 
 extern const uint8_t egg_game_background_start[]

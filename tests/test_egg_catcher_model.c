@@ -186,29 +186,69 @@ static void test_difficulty(void)
     assert(egg_catcher_model_move_interval_ms(&model) == 360);
     assert(egg_catcher_model_spawn_interval_ms(&model) == 1000);
 
-    model.score = 60;
-    assert(egg_catcher_model_move_interval_ms(&model) == 205);
-    assert(egg_catcher_model_spawn_interval_ms(&model) == 560);
-    assert(egg_catcher_model_speed_increased(&model));
-
-    model.score = 69;
-    assert(egg_catcher_model_move_interval_ms(&model) == 205);
-    assert(egg_catcher_model_spawn_interval_ms(&model) == 560);
+    model.score = 49;
+    assert(egg_catcher_model_move_interval_ms(&model) == 230);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 650);
     assert(!egg_catcher_model_speed_increased(&model));
 
-    model.score = 70;
-    assert(egg_catcher_model_move_interval_ms(&model) == 165);
+    model.score = 50;
+    assert(egg_catcher_model_move_interval_ms(&model) == 195);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 520);
+    assert(egg_catcher_model_speed_increased(&model));
+
+    model.score = 64;
+    assert(egg_catcher_model_move_interval_ms(&model) == 195);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 520);
+    assert(!egg_catcher_model_speed_increased(&model));
+
+    model.score = 65;
+    assert(egg_catcher_model_move_interval_ms(&model) == 170);
     assert(egg_catcher_model_spawn_interval_ms(&model) == 440);
     assert(egg_catcher_model_speed_increased(&model));
 
-    model.score = 85;
+    model.score = 80;
     assert(egg_catcher_model_move_interval_ms(&model) == 145);
-    assert(egg_catcher_model_spawn_interval_ms(&model) == 380);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 370);
+    assert(egg_catcher_model_speed_increased(&model));
+
+    model.score = 90;
+    assert(egg_catcher_model_move_interval_ms(&model) == 130);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 320);
     assert(egg_catcher_model_speed_increased(&model));
 
     model.score = EGG_CATCHER_WIN_SCORE;
-    assert(egg_catcher_model_move_interval_ms(&model) == 145);
-    assert(egg_catcher_model_spawn_interval_ms(&model) == 380);
+    assert(egg_catcher_model_move_interval_ms(&model) == 130);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 320);
+}
+
+static void test_spawn_timing_varies_by_difficulty(void)
+{
+    for (int difficulty = EGG_DIFFICULTY_KIDS;
+         difficulty <= EGG_DIFFICULTY_ADULTS; difficulty++) {
+        egg_catcher_model_t model;
+        egg_catcher_model_init(&model, (uint32_t)(900 + difficulty));
+        egg_catcher_model_set_difficulty(
+            &model, (egg_catcher_difficulty_t)difficulty);
+        egg_catcher_model_start(&model);
+
+        uint32_t previous_delay = model.spawn_delay_ms;
+        bool changed = false;
+        assert(previous_delay > 0U);
+
+        for (int sample = 0; sample < 8; sample++) {
+            for (int i = 0; i < EGG_CATCHER_MAX_EGGS; i++) {
+                model.eggs[i].active = false;
+            }
+            egg_catcher_event_t event = egg_catcher_model_advance(
+                &model, model.spawn_delay_ms - model.spawn_elapsed_ms);
+            assert((event & EGG_EVENT_SPAWNED) != 0);
+            assert(model.spawn_delay_ms > 0U);
+            assert(model.spawn_elapsed_ms < model.spawn_delay_ms);
+            if (model.spawn_delay_ms != previous_delay) changed = true;
+            previous_delay = model.spawn_delay_ms;
+        }
+        assert(changed);
+    }
 }
 
 static void test_upper_eggs_get_more_fall_frames(void)
@@ -276,7 +316,7 @@ static void test_long_running_session_stays_bounded(void)
         assert(model.state == EGG_GAME_PLAYING);
         assert(model.misses == 0);
         assert(model.move_elapsed_ms < egg_catcher_model_move_interval_ms(&model));
-        assert(model.spawn_elapsed_ms < egg_catcher_model_spawn_interval_ms(&model));
+        assert(model.spawn_elapsed_ms < model.spawn_delay_ms);
         for (int i = 0; i < EGG_CATCHER_MAX_EGGS; i++) {
             const egg_catcher_egg_t *egg = &model.eggs[i];
             if (!egg->active) continue;
@@ -297,6 +337,7 @@ int main(void)
     test_three_misses_end_game();
     test_missed_egg_stays_visible_while_falling();
     test_difficulty();
+    test_spawn_timing_varies_by_difficulty();
     test_upper_eggs_get_more_fall_frames();
     test_hundredth_catch_wins();
     test_long_running_session_stays_bounded();

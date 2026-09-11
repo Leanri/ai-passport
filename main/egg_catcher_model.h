@@ -55,6 +55,7 @@ typedef struct {
     uint32_t rng;
     uint32_t move_elapsed_ms;
     uint32_t spawn_elapsed_ms;
+    uint32_t spawn_delay_ms;
     uint8_t misses;
     egg_catcher_lane_t last_missed_lane;
     bool last_missed_upper_track;
