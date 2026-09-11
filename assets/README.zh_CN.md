@@ -24,6 +24,31 @@
 - 许可允许时保留可编辑源文件，并记录来源与许可。
 - 图片中不得包含设备二维码秘密、凭证或个人数据。
 
+### 接鸡蛋游戏背景
+
+- 源文件：`images/egg-catcher-background-source.png`，保留自此个人 fork 的现有 240 × 320 RGB 游戏背景。
+- 集成方式：`tools/prepare_egg_background.py` 使用相邻的原始沙地和地面纹理替换原角色区域内明显的平滑擦除痕迹，仅混合修复边界，并将小端 RGB565 像素写入 `main/assets/egg_game_background.rgb565`。
+- 重新生成：安装 Pillow 后，在仓库根目录运行 `python tools/prepare_egg_background.py`。
+
+### 接鸡蛋游戏狐狸
+
+- 源文件：`images/egg-catcher-fox-source.png`，911 × 927 RGBA 图片，由 fork 所有者提供并仅授权在此个人 fork 中使用；不声明更广泛的再分发许可。
+- 篮筐参考图：`images/egg-catcher-basket-front-reference.png`，由 fork 所有者按相同个人 fork 条款提供的配套 157 × 98 RGBA 裁剪图。其不透明白色背景只用于定位，不会嵌入固件。
+- 集成方式：`tools/prepare_egg_fox.py` 会移除与图片边缘相连的白色背景以及两只前臂之间封闭的白色空隙，再按透明区域裁剪，以最近邻采样缩放进 110 × 110 画布，镜像生成左侧动作，并将 LVGL ARGB8888/BGRA 字节写入 `main/assets/egg_game_fox_{left,right}.argb8888`。脚本会核对提供的篮筐裁剪图与狐狸源图，并从生成的动作中提取匹配的透明 19 × 11 篮筐前壁图层，写入 `main/assets/egg_game_basket_front_{left,right}.argb8888`。
+- 重新生成：安装 Pillow 后，在仓库根目录运行 `python tools/prepare_egg_fox.py`。
+
+### 接鸡蛋游戏胜利画面
+
+- 源文件：`images/egg-catcher-win-source.png`，1086 × 1448 RGB 图片，由 fork 所有者提供并仅授权在此个人 fork 中使用；不声明更广泛的再分发许可。
+- 集成方式：`tools/prepare_egg_win.py` 将画面居中适配到 240 × 320 屏幕，并把小端 RGB565 像素写入 `main/assets/egg_game_win.rgb565`。游戏会在接住第 100 个鸡蛋后显示它。
+- 重新生成：安装 Pillow 后，在仓库根目录运行 `python tools/prepare_egg_win.py`。
+
+### 接鸡蛋游戏封面
+
+- 源文件：`images/egg-catcher-cover-source.png`，1086 × 1448 RGB 图片，由 fork 所有者提供并仅授权在此个人 fork 中使用；不声明更广泛的再分发许可。
+- 集成方式：`tools/prepare_egg_cover.py` 将画面居中适配到 240 × 320 屏幕，并把小端 RGB565 像素写入 `main/assets/egg_game_cover.rgb565`。开始游戏前，它会显示在儿童/成人模式选择器后方。
+- 重新生成：安装 Pillow 后，在仓库根目录运行 `python tools/prepare_egg_cover.py`。
+
 ## 音乐与音效（music）
 
 可复用的音乐与音效源码放在 `music/`。

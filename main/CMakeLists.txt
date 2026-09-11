@@ -10,6 +10,17 @@ idf_component_register(
          "demo_wifi.c"
          "demo_ble.c"
          "demo_low_power.c"
+         "egg_catcher.c"
+         "egg_catcher_model.c"
+         "egg_catcher_visual.c"
+         "egg_sprites.c"
     INCLUDE_DIRS "."
     REQUIRES bsp bt esp_event esp_hw_support esp_netif esp_timer esp_wifi nvs_flash
+    EMBED_FILES "assets/egg_game_background.rgb565"
+                "assets/egg_game_cover.rgb565"
+                "assets/egg_game_win.rgb565"
+                "assets/egg_game_fox_left.argb8888"
+                "assets/egg_game_fox_right.argb8888"
+                "assets/egg_game_basket_front_left.argb8888"
+                "assets/egg_game_basket_front_right.argb8888"
 )

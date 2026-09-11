@@ -6,6 +6,33 @@
 
 ## Unreleased
 
+- Added the user-supplied `STEAL 100 EGGS` artwork as the full-screen game cover behind the Kids/Adults selector.
+- Added the user-supplied full-screen victory artwork shown immediately after the fox catches the hundredth egg.
+- Replaced the victory artwork with the user-supplied `ALL 100 EGGS ARE MINE` scene.
+- Removed the interim FoloToy demo menu so the standalone Egg Catcher screen appears at power-on; egg movement begins only after an `UP` or `DOWN` press.
+- Added transparent mirrored hand/basket-front layers and a fixed 180 ms catch animation: the egg pauses at the opening behind the basket front for 90 ms, sinks no more than four pixels for 90 ms, and then disappears without any below-basket frame.
+- Added pre-game `KIDS` and `ADULTS` choices: Kids stays slower through 100 eggs, while Adults follows a faster progression; both tracks still share one movement speed and every threshold shows `SPEED UP!`.
+- Made direction presses travel through one non-blocking queue and kept the basket front above every caught egg, including simultaneous catch animations and immediate turns.
+- Varied the delay before each new egg so releases no longer settle into a repeated synchronized rhythm; Kids keeps at least three movement beats between releases, while Adults permits shorter combinations and accelerates again at 50, 65, 80, and 90 catches.
+- Positioned the in-game fox, basket, catch points, and missed-egg effects to reveal the illustrated ground while keeping the lower-hand basket beneath the lower chute.
+- Added a distinct three-note rising jingle at every speed threshold and prioritized it over queued catch sounds so players can hear each difficulty increase.
+- Replaced the gameplay fox with the user-supplied lower-arm pose, removed the enclosed white gap between its forearms, and regenerated its mirrored basket-front overlays so caught eggs remain between the basket layers.
+- Increased the pace of every Adults difficulty tier by about ten percent while leaving Kids mode unchanged.
+- Increased the Adults pace again from 50 catches onward, with progressively shorter movement and spawn intervals through 100.
+- Restored visible pixel-art sand and ground texture behind the fox's tail and legs instead of leaving the former character-removal area visibly smoothed.
+
+- Added the standalone Egg Catcher game: two-lane egg movement, direct two-button left/right controls, score, misses, restart flow, increasing difficulty, battery status, two distinct reference-derived wolf poses, detailed hens, chutes, houses and shrubs, and host-tested game logic.
+- Restored the Egg Catcher background's original thin chutes without the duplicate overpaint, completed the wolf's missing rear foot in both poses, reduced repeated LVGL label updates, and added periodic memory/stack diagnostics plus a one-hour model stress test for restart investigation.
+- Changed basket contact to latch a catch immediately, placed falling eggs behind the basket rim, and added distinct start, catch, shell-break, and game-over sounds through a non-blocking audio worker.
+- Restored the wolf's missing pointed ear silhouette in both poses.
+- Changed Egg Catcher difficulty to clear score tiers at 20 and 40 catches, and gave upper eggs more fall frames so they descend at roughly the same visual speed as lower eggs.
+- Made an egg stay visible in front of the basket opening when contact is made, latch the catch at that moment, then sink behind the basket rim on the next frame.
+- Removed a stray fragment of the reference egg that was baked into the wolf sprite above its hand.
+- Added six gradual speed increases at every 15 catches and a 100-egg victory screen with a short win sound and restart prompt.
+- Restored the lower button's dedicated role: hold `OK` to leave Egg Catcher for its title screen, while only `UP` and `DOWN` control the basket.
+- Replaced the wolf with the user-supplied orange fox, preserving its scarf, outfit, tail, and basket in mirrored 110 × 110 pixel poses.
+- Stopped caught eggs after their visible basket-contact frame so they no longer continue falling below the basket.
+
 - Added the supplied 80-byte CW2017 profile for the specified 520 mAh cell, including content/update-flag checks, verified writes, the required restart sequence, and bounded SOC-readiness polling.
 
 - Expanded the environment bootstrap document: added Espressif's Git service mirror (`git.espressif.com.cn`) as the preferred mainland-China route for ESP-IDF v5.5.3 and its submodules, documented submodule long-wait/timeout handling, in-place repair, and the pinned-commit shallow fetch for large submodules such as `esp32-wifi-lib`, warned about stale per-repository Jihulab `insteadOf` residue, and added the official offline release archive as a last-resort fallback (learned from `esp-mosaico/esp-mosaico-vibe`).
