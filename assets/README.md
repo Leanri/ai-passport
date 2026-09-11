@@ -39,6 +39,12 @@ Store reusable source images and generated display assets in `images/`.
 - Integration: `tools/prepare_egg_win.py` center-fits the artwork to the 240 × 320 display and writes little-endian RGB565 pixels to `main/assets/egg_game_win.rgb565`. The game displays it after the hundredth catch.
 - Regeneration: install Pillow and run `python tools/prepare_egg_win.py` from the repository root.
 
+### Egg Catcher cover
+
+- Source: `images/egg-catcher-cover-source.png`, a 1086 × 1448 RGB image supplied by the fork owner for use in this personal fork; no broader redistribution license is claimed.
+- Integration: `tools/prepare_egg_cover.py` center-fits the artwork to the 240 × 320 display and writes little-endian RGB565 pixels to `main/assets/egg_game_cover.rgb565`. The game shows it behind the Kids/Adults selector before play begins.
+- Regeneration: install Pillow and run `python tools/prepare_egg_cover.py` from the repository root.
+
 ## Music and sound effects
 
 Store reusable music and sound-effect sources in `music/`.

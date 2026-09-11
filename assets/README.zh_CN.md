@@ -37,6 +37,12 @@
 - 集成方式：`tools/prepare_egg_win.py` 将画面居中适配到 240 × 320 屏幕，并把小端 RGB565 像素写入 `main/assets/egg_game_win.rgb565`。游戏会在接住第 100 个鸡蛋后显示它。
 - 重新生成：安装 Pillow 后，在仓库根目录运行 `python tools/prepare_egg_win.py`。
 
+### 接鸡蛋游戏封面
+
+- 源文件：`images/egg-catcher-cover-source.png`，1086 × 1448 RGB 图片，由 fork 所有者提供并仅授权在此个人 fork 中使用；不声明更广泛的再分发许可。
+- 集成方式：`tools/prepare_egg_cover.py` 将画面居中适配到 240 × 320 屏幕，并把小端 RGB565 像素写入 `main/assets/egg_game_cover.rgb565`。开始游戏前，它会显示在儿童/成人模式选择器后方。
+- 重新生成：安装 Pillow 后，在仓库根目录运行 `python tools/prepare_egg_cover.py`。
+
 ## 音乐与音效（music）
 
 可复用的音乐与音效源码放在 `music/`。
