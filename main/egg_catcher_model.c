@@ -55,7 +55,7 @@ uint32_t egg_catcher_model_move_interval_ms(const egg_catcher_model_t *model)
         420U, 370U, 330U, 300U, 280U, 260U, 240U,
     };
     static const uint16_t adult_interval_ms[] = {
-        360U, 300U, 260U, 230U, 195U, 170U, 145U, 130U,
+        325U, 270U, 235U, 205U, 175U, 155U, 130U, 115U,
     };
     const uint16_t *intervals = model->difficulty == EGG_DIFFICULTY_ADULTS
                                     ? adult_interval_ms : kids_interval_ms;
@@ -68,7 +68,7 @@ uint32_t egg_catcher_model_spawn_interval_ms(const egg_catcher_model_t *model)
         1200U, 1080U, 970U, 880U, 800U, 730U, 670U,
     };
     static const uint16_t adult_interval_ms[] = {
-        1000U, 850U, 740U, 650U, 520U, 440U, 370U, 320U,
+        900U, 765U, 665U, 585U, 470U, 395U, 335U, 290U,
     };
     const uint16_t *intervals = model->difficulty == EGG_DIFFICULTY_ADULTS
                                     ? adult_interval_ms : kids_interval_ms;

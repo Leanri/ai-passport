@@ -183,42 +183,42 @@ static void test_difficulty(void)
     egg_catcher_model_set_difficulty(&model, EGG_DIFFICULTY_ADULTS);
     egg_catcher_model_start(&model);
     assert(model.difficulty == EGG_DIFFICULTY_ADULTS);
-    assert(egg_catcher_model_move_interval_ms(&model) == 360);
-    assert(egg_catcher_model_spawn_interval_ms(&model) == 1000);
+    assert(egg_catcher_model_move_interval_ms(&model) == 325);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 900);
 
     model.score = 49;
-    assert(egg_catcher_model_move_interval_ms(&model) == 230);
-    assert(egg_catcher_model_spawn_interval_ms(&model) == 650);
+    assert(egg_catcher_model_move_interval_ms(&model) == 205);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 585);
     assert(!egg_catcher_model_speed_increased(&model));
 
     model.score = 50;
-    assert(egg_catcher_model_move_interval_ms(&model) == 195);
-    assert(egg_catcher_model_spawn_interval_ms(&model) == 520);
+    assert(egg_catcher_model_move_interval_ms(&model) == 175);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 470);
     assert(egg_catcher_model_speed_increased(&model));
 
     model.score = 64;
-    assert(egg_catcher_model_move_interval_ms(&model) == 195);
-    assert(egg_catcher_model_spawn_interval_ms(&model) == 520);
+    assert(egg_catcher_model_move_interval_ms(&model) == 175);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 470);
     assert(!egg_catcher_model_speed_increased(&model));
 
     model.score = 65;
-    assert(egg_catcher_model_move_interval_ms(&model) == 170);
-    assert(egg_catcher_model_spawn_interval_ms(&model) == 440);
+    assert(egg_catcher_model_move_interval_ms(&model) == 155);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 395);
     assert(egg_catcher_model_speed_increased(&model));
 
     model.score = 80;
-    assert(egg_catcher_model_move_interval_ms(&model) == 145);
-    assert(egg_catcher_model_spawn_interval_ms(&model) == 370);
+    assert(egg_catcher_model_move_interval_ms(&model) == 130);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 335);
     assert(egg_catcher_model_speed_increased(&model));
 
     model.score = 90;
-    assert(egg_catcher_model_move_interval_ms(&model) == 130);
-    assert(egg_catcher_model_spawn_interval_ms(&model) == 320);
+    assert(egg_catcher_model_move_interval_ms(&model) == 115);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 290);
     assert(egg_catcher_model_speed_increased(&model));
 
     model.score = EGG_CATCHER_WIN_SCORE;
-    assert(egg_catcher_model_move_interval_ms(&model) == 130);
-    assert(egg_catcher_model_spawn_interval_ms(&model) == 320);
+    assert(egg_catcher_model_move_interval_ms(&model) == 115);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 290);
 }
 
 static void test_spawn_timing_varies_by_difficulty(void)
