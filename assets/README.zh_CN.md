@@ -28,7 +28,7 @@
 
 - 源文件：`images/egg-catcher-fox-source.png`，911 × 927 RGBA 图片，由 fork 所有者提供并仅授权在此个人 fork 中使用；不声明更广泛的再分发许可。
 - 篮筐参考图：`images/egg-catcher-basket-front-reference.png`，由 fork 所有者按相同个人 fork 条款提供的配套 157 × 98 RGBA 裁剪图。其不透明白色背景只用于定位，不会嵌入固件。
-- 集成方式：`tools/prepare_egg_fox.py` 只移除与图片边缘相连的白色背景，再按透明区域裁剪，以最近邻采样缩放进 110 × 110 画布，镜像生成左侧动作，并将 LVGL ARGB8888/BGRA 字节写入 `main/assets/egg_game_fox_{left,right}.argb8888`。脚本会核对提供的篮筐裁剪图与狐狸源图，并从生成的动作中提取匹配的透明 19 × 11 篮筐前壁图层，写入 `main/assets/egg_game_basket_front_{left,right}.argb8888`。
+- 集成方式：`tools/prepare_egg_fox.py` 会移除与图片边缘相连的白色背景以及两只前臂之间封闭的白色空隙，再按透明区域裁剪，以最近邻采样缩放进 110 × 110 画布，镜像生成左侧动作，并将 LVGL ARGB8888/BGRA 字节写入 `main/assets/egg_game_fox_{left,right}.argb8888`。脚本会核对提供的篮筐裁剪图与狐狸源图，并从生成的动作中提取匹配的透明 19 × 11 篮筐前壁图层，写入 `main/assets/egg_game_basket_front_{left,right}.argb8888`。
 - 重新生成：安装 Pillow 后，在仓库根目录运行 `python tools/prepare_egg_fox.py`。
 
 ### 接鸡蛋游戏胜利画面

@@ -192,33 +192,33 @@ static void test_difficulty(void)
     assert(!egg_catcher_model_speed_increased(&model));
 
     model.score = 50;
-    assert(egg_catcher_model_move_interval_ms(&model) == 175);
-    assert(egg_catcher_model_spawn_interval_ms(&model) == 470);
+    assert(egg_catcher_model_move_interval_ms(&model) == 160);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 430);
     assert(egg_catcher_model_speed_increased(&model));
 
     model.score = 64;
-    assert(egg_catcher_model_move_interval_ms(&model) == 175);
-    assert(egg_catcher_model_spawn_interval_ms(&model) == 470);
+    assert(egg_catcher_model_move_interval_ms(&model) == 160);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 430);
     assert(!egg_catcher_model_speed_increased(&model));
 
     model.score = 65;
-    assert(egg_catcher_model_move_interval_ms(&model) == 155);
-    assert(egg_catcher_model_spawn_interval_ms(&model) == 395);
+    assert(egg_catcher_model_move_interval_ms(&model) == 140);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 360);
     assert(egg_catcher_model_speed_increased(&model));
 
     model.score = 80;
-    assert(egg_catcher_model_move_interval_ms(&model) == 130);
-    assert(egg_catcher_model_spawn_interval_ms(&model) == 335);
+    assert(egg_catcher_model_move_interval_ms(&model) == 120);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 305);
     assert(egg_catcher_model_speed_increased(&model));
 
     model.score = 90;
-    assert(egg_catcher_model_move_interval_ms(&model) == 115);
-    assert(egg_catcher_model_spawn_interval_ms(&model) == 290);
+    assert(egg_catcher_model_move_interval_ms(&model) == 105);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 265);
     assert(egg_catcher_model_speed_increased(&model));
 
     model.score = EGG_CATCHER_WIN_SCORE;
-    assert(egg_catcher_model_move_interval_ms(&model) == 115);
-    assert(egg_catcher_model_spawn_interval_ms(&model) == 290);
+    assert(egg_catcher_model_move_interval_ms(&model) == 105);
+    assert(egg_catcher_model_spawn_interval_ms(&model) == 265);
 }
 
 static void test_spawn_timing_varies_by_difficulty(void)

@@ -16,8 +16,9 @@
 - Varied the delay before each new egg so releases no longer settle into a repeated synchronized rhythm; Kids keeps at least three movement beats between releases, while Adults permits shorter combinations and accelerates again at 50, 65, 80, and 90 catches.
 - Positioned the in-game fox, basket, catch points, and missed-egg effects to reveal the illustrated ground while keeping the lower-hand basket beneath the lower chute.
 - Added a distinct three-note rising jingle at every speed threshold and prioritized it over queued catch sounds so players can hear each difficulty increase.
-- Replaced the gameplay fox with the user-supplied lower-arm pose and regenerated its mirrored basket-front overlays so caught eggs remain between the basket layers.
+- Replaced the gameplay fox with the user-supplied lower-arm pose, removed the enclosed white gap between its forearms, and regenerated its mirrored basket-front overlays so caught eggs remain between the basket layers.
 - Increased the pace of every Adults difficulty tier by about ten percent while leaving Kids mode unchanged.
+- Increased the Adults pace again from 50 catches onward, with progressively shorter movement and spawn intervals through 100.
 
 - Added the standalone Egg Catcher game: two-lane egg movement, direct two-button left/right controls, score, misses, restart flow, increasing difficulty, battery status, two distinct reference-derived wolf poses, detailed hens, chutes, houses and shrubs, and host-tested game logic.
 - Restored the Egg Catcher background's original thin chutes without the duplicate overpaint, completed the wolf's missing rear foot in both poses, reduced repeated LVGL label updates, and added periodic memory/stack diagnostics plus a one-hour model stress test for restart investigation.

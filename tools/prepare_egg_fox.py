@@ -14,13 +14,17 @@ OUTPUT_DIR = ROOT / "main/assets"
 SPRITE_SIZE = 110
 CONTENT_SIZE = 108
 BASKET_SOURCE_BOX = (665, 550, 822, 648)
+ENCLOSED_BACKGROUND_SEEDS = ((610, 490),)
 BASKET_FRONT_W = 19
 BASKET_FRONT_H = 11
 RIGHT_BASKET_FRONT_BOX = (82, 66, 101, 77)
 LEFT_BASKET_FRONT_BOX = (9, 66, 28, 77)
 
 
-def remove_connected_white_background(source: Image.Image) -> Image.Image:
+def remove_connected_white_background(
+    source: Image.Image,
+    extra_seeds: tuple[tuple[int, int], ...] = (),
+) -> Image.Image:
     """Remove only near-white pixels connected to an outer image edge."""
     image = source.convert("RGBA")
     width, height = image.size
@@ -51,6 +55,12 @@ def remove_connected_white_background(source: Image.Image) -> Image.Image:
     for y in range(height):
         add_if_background(0, y)
         add_if_background(width - 1, y)
+    for x, y in extra_seeds:
+        if not (0 <= x < width and 0 <= y < height):
+            raise ValueError(f"background seed outside source: {(x, y)}")
+        if not candidate[y * width + x]:
+            raise ValueError(f"background seed is not near-white: {(x, y)}")
+        add_if_background(x, y)
 
     while pending:
         x, y = pending.popleft()
@@ -88,7 +98,9 @@ def make_right_sprite() -> Image.Image:
     """Clear the supplied white backdrop and fit the pose without smoothing."""
     original = Image.open(SOURCE).convert("RGBA")
     verify_basket_reference(original)
-    source = remove_connected_white_background(original)
+    source = remove_connected_white_background(
+        original, ENCLOSED_BACKGROUND_SEEDS
+    )
     bounds = source.getchannel("A").getbbox()
     if bounds is None:
         raise ValueError(f"source has no visible pixels: {SOURCE}")
